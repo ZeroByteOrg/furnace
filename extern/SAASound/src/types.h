@@ -12,7 +12,9 @@
      defined(__arm__) || \
     (defined(__mips__) && defined(__MIPSEL__))
 #else
+#ifndef __BIG_ENDIAN
 #define __BIG_ENDIAN
+#endif
 #endif
 
 
@@ -28,7 +30,7 @@ typedef struct
 } ENVDATA;
 
 #ifdef WIN32
-extern "C" void _stdcall OutputDebugStringA (char*);
+extern "C" void __stdcall OutputDebugStringA (char*);
 #endif
 
 #endif

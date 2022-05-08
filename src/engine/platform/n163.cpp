@@ -161,6 +161,10 @@ void DivPlatformN163::acquire(short* bufL, short* bufR, size_t start, size_t len
     if (out<-32768) out=-32768;
     bufL[i]=bufR[i]=out;
 
+    if (n163.voice_cycle()==0x78) for (int i=0; i<8; i++) {
+      oscBuf[i]->data[oscBuf[i]->needle++]=n163.chan_out(i)<<7;
+    }
+
     // command queue
     while (!writes.empty()) {
       QueuedWrite w=writes.front();
@@ -262,6 +266,12 @@ void DivPlatformN163::tick(bool sysTick) {
       }
     }
     if (chan[i].std.pitch.had) {
+      if (chan[i].std.pitch.mode) {
+        chan[i].pitch2+=chan[i].std.pitch.val;
+        CLAMP_VAR(chan[i].pitch2,-2048,2048);
+      } else {
+        chan[i].pitch2=chan[i].std.pitch.val;
+      }
       chan[i].freqChanged=true;
     }
     if (chan[i].std.ex1.had) {
@@ -347,7 +357,7 @@ void DivPlatformN163::tick(bool sysTick) {
       chan[i].waveUpdated=false;
     }
     if (chan[i].freqChanged || chan[i].keyOn || chan[i].keyOff) {
-      chan[i].freq=parent->calcFreq((((chan[i].baseFreq*chan[i].waveLen)*(chanMax+1))/16),chan[i].pitch,false,0)+chan[i].std.pitch.val;
+      chan[i].freq=parent->calcFreq((((chan[i].baseFreq*chan[i].waveLen)*(chanMax+1))/16),chan[i].pitch,false,0,chan[i].pitch2);
       if (chan[i].freq<0) chan[i].freq=0;
       if (chan[i].freq>0x3ffff) chan[i].freq=0x3ffff;
       if (chan[i].keyOn) {
@@ -374,7 +384,7 @@ void DivPlatformN163::tick(bool sysTick) {
 int DivPlatformN163::dispatch(DivCommand c) {
   switch (c.cmd) {
     case DIV_CMD_NOTE_ON: {
-      DivInstrument* ins=parent->getIns(chan[c.chan].ins);
+      DivInstrument* ins=parent->getIns(chan[c.chan].ins,DIV_INS_N163);
       if (chan[c.chan].insChanged) {
         chan[c.chan].wave=ins->n163.wave;
         chan[c.chan].ws.changeWave1(chan[c.chan].wave);
@@ -398,7 +408,7 @@ int DivPlatformN163::dispatch(DivCommand c) {
       if (!isMuted[c.chan]) {
         chan[c.chan].volumeChanged=true;
       }
-      chan[c.chan].std.init(ins);
+      chan[c.chan].macroInit(ins);
       chan[c.chan].ws.init(ins,chan[c.chan].waveLen,15,chan[c.chan].insChanged);
       break;
     }
@@ -406,7 +416,7 @@ int DivPlatformN163::dispatch(DivCommand c) {
       chan[c.chan].active=false;
       chan[c.chan].keyOff=true;
       chan[c.chan].keyOn=false;
-      //chan[c.chan].std.init(NULL);
+      //chan[c.chan].macroInit(NULL);
       break;
     case DIV_CMD_NOTE_OFF_ENV:
       chan[c.chan].active=false;
@@ -546,7 +556,7 @@ int DivPlatformN163::dispatch(DivCommand c) {
     case DIV_CMD_PRE_PORTA:
       if (chan[c.chan].active && c.value2) {
         if (parent->song.resetMacroOnPorta) {
-          chan[c.chan].std.init(parent->getIns(chan[c.chan].ins));
+          chan[c.chan].macroInit(parent->getIns(chan[c.chan].ins,DIV_INS_N163));
           chan[c.chan].keyOn=true;
         }
       }
@@ -613,6 +623,10 @@ void* DivPlatformN163::getChanState(int ch) {
   return &chan[ch];
 }
 
+DivDispatchOscBuffer* DivPlatformN163::getOscBuffer(int ch) {
+  return oscBuf[ch];
+}
+
 unsigned char* DivPlatformN163::getRegisterPool() {
   for (int i=0; i<128; i++) {
     regPool[i]=n163.reg(i);
@@ -672,6 +686,9 @@ void DivPlatformN163::setFlags(unsigned int flags) {
   rate/=15;
   n163.set_multiplex(multiplex);
   rWrite(0x7f,initChanMax<<4);
+  for (int i=0; i<8; i++) {
+    oscBuf[i]->rate=rate/(initChanMax+1);
+  }
 }
 
 int DivPlatformN163::init(DivEngine* p, int channels, int sugRate, unsigned int flags) {
@@ -680,6 +697,7 @@ int DivPlatformN163::init(DivEngine* p, int channels, int sugRate, unsigned int 
   skipRegisterWrites=false;
   for (int i=0; i<8; i++) {
     isMuted[i]=false;
+    oscBuf[i]=new DivDispatchOscBuffer;
   }
   setFlags(flags);
 
@@ -689,6 +707,9 @@ int DivPlatformN163::init(DivEngine* p, int channels, int sugRate, unsigned int 
 }
 
 void DivPlatformN163::quit() {
+  for (int i=0; i<8; i++) {
+    delete oscBuf[i];
+  }
 }
 
 DivPlatformN163::~DivPlatformN163() {

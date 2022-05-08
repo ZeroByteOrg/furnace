@@ -91,12 +91,15 @@ const char* DivPlatformAmiga::getEffectName(unsigned char effect) {
   }
 
 void DivPlatformAmiga::acquire(short* bufL, short* bufR, size_t start, size_t len) {
-  static int outL, outR;
+  static int outL, outR, output;
   for (size_t h=start; h<start+len; h++) {
     outL=0;
     outR=0;
     for (int i=0; i<4; i++) {
-      if (!chan[i].active) continue;
+      if (!chan[i].active) {
+        oscBuf[i]->data[oscBuf[i]->needle++]=0;
+        continue;
+      }
       if (chan[i].useWave || (chan[i].sample>=0 && chan[i].sample<parent->song.sampleLen)) {
         chan[i].audSub-=AMIGA_DIVIDER;
         if (chan[i].audSub<0) {
@@ -139,13 +142,17 @@ void DivPlatformAmiga::acquire(short* bufL, short* bufR, size_t start, size_t le
         }
       }
       if (!isMuted[i]) {
+        output=chan[i].audDat*chan[i].outVol;
         if (i==0 || i==3) {
-          outL+=((chan[i].audDat*chan[i].outVol)*sep1)>>7;
-          outR+=((chan[i].audDat*chan[i].outVol)*sep2)>>7;
+          outL+=(output*sep1)>>7;
+          outR+=(output*sep2)>>7;
         } else {
-          outL+=((chan[i].audDat*chan[i].outVol)*sep2)>>7;
-          outR+=((chan[i].audDat*chan[i].outVol)*sep1)>>7;
+          outL+=(output*sep2)>>7;
+          outR+=(output*sep1)>>7;
         }
+        oscBuf[i]->data[oscBuf[i]->needle++]=output<<2;
+      } else {
+        oscBuf[i]->data[oscBuf[i]->needle++]=0;
       }
     }
     filter[0][0]+=(filtConst*(outL-filter[0][0]))>>12;
@@ -198,6 +205,12 @@ void DivPlatformAmiga::tick(bool sysTick) {
       chan[i].ws.tick();
     }
     if (chan[i].std.pitch.had) {
+      if (chan[i].std.pitch.mode) {
+        chan[i].pitch2+=chan[i].std.pitch.val;
+        CLAMP_VAR(chan[i].pitch2,-2048,2048);
+      } else {
+        chan[i].pitch2=chan[i].std.pitch.val;
+      }
       chan[i].freqChanged=true;
     }
     if (chan[i].std.phaseReset.had) {
@@ -206,8 +219,8 @@ void DivPlatformAmiga::tick(bool sysTick) {
       }
     }
     if (chan[i].freqChanged || chan[i].keyOn || chan[i].keyOff) {
-      //DivInstrument* ins=parent->getIns(chan[i].ins);
-      chan[i].freq=parent->calcFreq(chan[i].baseFreq,chan[i].pitch,true)+chan[i].std.pitch.val;
+      //DivInstrument* ins=parent->getIns(chan[i].ins,DIV_INS_AMIGA);
+      chan[i].freq=parent->calcFreq(chan[i].baseFreq,chan[i].pitch,true,0,chan[i].pitch2);
       if (chan[i].freq>4095) chan[i].freq=4095;
       if (chan[i].freq<0) chan[i].freq=0;
       if (chan[i].keyOn) {
@@ -224,7 +237,7 @@ void DivPlatformAmiga::tick(bool sysTick) {
 int DivPlatformAmiga::dispatch(DivCommand c) {
   switch (c.cmd) {
     case DIV_CMD_NOTE_ON: {
-      DivInstrument* ins=parent->getIns(chan[c.chan].ins);
+      DivInstrument* ins=parent->getIns(chan[c.chan].ins,DIV_INS_AMIGA);
       double off=1.0;
       if (ins->amiga.useWave) {
         chan[c.chan].useWave=true;
@@ -266,7 +279,7 @@ int DivPlatformAmiga::dispatch(DivCommand c) {
       }
       chan[c.chan].active=true;
       chan[c.chan].keyOn=true;
-      chan[c.chan].std.init(ins);
+      chan[c.chan].macroInit(ins);
       if (chan[c.chan].useWave) {
         chan[c.chan].ws.init(ins,chan[c.chan].audLen<<1,255,chan[c.chan].insChanged);
       }
@@ -277,7 +290,7 @@ int DivPlatformAmiga::dispatch(DivCommand c) {
       chan[c.chan].sample=-1;
       chan[c.chan].active=false;
       chan[c.chan].keyOff=true;
-      chan[c.chan].std.init(NULL);
+      chan[c.chan].macroInit(NULL);
       break;
     case DIV_CMD_NOTE_OFF_ENV:
     case DIV_CMD_ENV_RELEASE:
@@ -314,7 +327,7 @@ int DivPlatformAmiga::dispatch(DivCommand c) {
       chan[c.chan].ws.changeWave1(chan[c.chan].wave);
       break;
     case DIV_CMD_NOTE_PORTA: {
-      DivInstrument* ins=parent->getIns(chan[c.chan].ins);
+      DivInstrument* ins=parent->getIns(chan[c.chan].ins,DIV_INS_AMIGA);
       chan[c.chan].sample=ins->amiga.initSample;
       double off=1.0;
       if (!chan[c.chan].useWave && chan[c.chan].sample>=0 && chan[c.chan].sample<parent->song.sampleLen) {
@@ -364,7 +377,7 @@ int DivPlatformAmiga::dispatch(DivCommand c) {
     }
     case DIV_CMD_PRE_PORTA:
       if (chan[c.chan].active && c.value2) {
-        if (parent->song.resetMacroOnPorta) chan[c.chan].std.init(parent->getIns(chan[c.chan].ins));
+        if (parent->song.resetMacroOnPorta) chan[c.chan].macroInit(parent->getIns(chan[c.chan].ins,DIV_INS_AMIGA));
       }
       chan[c.chan].inPorta=c.value;
       break;
@@ -411,6 +424,10 @@ void DivPlatformAmiga::forceIns() {
 
 void* DivPlatformAmiga::getChanState(int ch) {
   return &chan[ch];
+}
+
+DivDispatchOscBuffer* DivPlatformAmiga::getOscBuffer(int ch) {
+  return oscBuf[ch];
 }
 
 void DivPlatformAmiga::reset() {
@@ -463,6 +480,9 @@ void DivPlatformAmiga::setFlags(unsigned int flags) {
     chipClock=COLOR_NTSC;
   }
   rate=chipClock/AMIGA_DIVIDER;
+  for (int i=0; i<4; i++) {
+    oscBuf[i]->rate=rate;
+  }
   sep1=((flags>>8)&127)+127;
   sep2=127-((flags>>8)&127);
   amigaModel=flags&2;
@@ -481,6 +501,7 @@ int DivPlatformAmiga::init(DivEngine* p, int channels, int sugRate, unsigned int
   dumpWrites=false;
   skipRegisterWrites=false;
   for (int i=0; i<4; i++) {
+    oscBuf[i]=new DivDispatchOscBuffer;
     isMuted[i]=false;
   }
   setFlags(flags);
@@ -489,4 +510,7 @@ int DivPlatformAmiga::init(DivEngine* p, int channels, int sugRate, unsigned int
 }
 
 void DivPlatformAmiga::quit() {
+  for (int i=0; i<4; i++) {
+    delete oscBuf[i];
+  }
 }

@@ -29,6 +29,14 @@ void* DivDispatch::getChanState(int chan) {
   return NULL;
 }
 
+DivMacroInt* DivDispatch::getChanMacroInt(int chan) {
+  return NULL;
+}
+
+DivDispatchOscBuffer* DivDispatch::getOscBuffer(int chan) {
+  return NULL;
+}
+
 unsigned char* DivDispatch::getRegisterPool() {
   return NULL;
 }
@@ -131,6 +139,22 @@ void DivDispatch::poke(std::vector<DivRegWrite>& wlist) {
 
 const char** DivDispatch::getRegisterSheet() {
   return NULL;
+}
+
+const void* DivDispatch::getSampleMem(int index) {
+  return NULL;
+}
+
+size_t DivDispatch::getSampleMemCapacity(int index) {
+  return 0;
+}
+
+size_t DivDispatch::getSampleMemUsage(int index) {
+  return 0;
+}
+
+void DivDispatch::renderSamples() {
+  
 }
 
 int DivDispatch::init(DivEngine* p, int channels, int sugRate, unsigned int flags) {

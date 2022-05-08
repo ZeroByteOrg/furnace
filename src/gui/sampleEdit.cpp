@@ -75,21 +75,21 @@ void FurnaceGUI::drawSampleEdit() {
           }
 
           ImGui::TableNextColumn();
-          ImGui::Text("Rate (Hz)");
-          ImGui::SameLine();
-          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-          if (ImGui::InputInt("##SampleRate",&sample->rate,10,200)) { MARK_MODIFIED
-            if (sample->rate<100) sample->rate=100;
-            if (sample->rate>96000) sample->rate=96000;
-          }
-
-          ImGui::TableNextColumn();
           ImGui::Text("C-4 (Hz)");
           ImGui::SameLine();
           ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
           if (ImGui::InputInt("##SampleCenter",&sample->centerRate,10,200)) { MARK_MODIFIED
             if (sample->centerRate<100) sample->centerRate=100;
             if (sample->centerRate>65535) sample->centerRate=65535;
+          }
+
+          ImGui::TableNextColumn();
+          ImGui::Text("Compat Rate");
+          ImGui::SameLine();
+          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+          if (ImGui::InputInt("##SampleRate",&sample->rate,10,200)) { MARK_MODIFIED
+            if (sample->rate<100) sample->rate=100;
+            if (sample->rate>96000) sample->rate=96000;
           }
 
           ImGui::TableNextColumn();
@@ -588,22 +588,22 @@ void FurnaceGUI::drawSampleEdit() {
           }
 
           ImGui::TableNextColumn();
-          ImGui::Text("Rate (Hz)");
-          ImGui::SameLine();
-          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-          if (ImGui::InputInt("##SampleRate",&sample->rate,10,200)) { MARK_MODIFIED
-            if (sample->rate<100) sample->rate=100;
-            if (sample->rate>96000) sample->rate=96000;
-          }
-
-          ImGui::TableNextRow();
-          ImGui::TableNextColumn();
           ImGui::Text("C-4 (Hz)");
           ImGui::SameLine();
           ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
           if (ImGui::InputInt("##SampleCenter",&sample->centerRate,10,200)) { MARK_MODIFIED
             if (sample->centerRate<100) sample->centerRate=100;
             if (sample->centerRate>65535) sample->centerRate=65535;
+          }
+
+          ImGui::TableNextRow();
+          ImGui::TableNextColumn();
+          ImGui::Text("Compat Rate");
+          ImGui::SameLine();
+          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+          if (ImGui::InputInt("##SampleRate",&sample->rate,10,200)) { MARK_MODIFIED
+            if (sample->rate<100) sample->rate=100;
+            if (sample->rate>96000) sample->rate=96000;
           }
 
           ImGui::TableNextColumn();
@@ -1137,7 +1137,8 @@ void FurnaceGUI::drawSampleEdit() {
             ImU32 centerLineColor=ImAlphaBlendColors(bgColor,ImGui::GetColorU32(ImGuiCol_PlotLines,0.25));
             for (int i=0; i<availY; i++) {
               for (int j=0; j<availX; j++) {
-                if (sample->loopStart>=0 && sample->loopStart<(int)sample->samples && ((j+samplePos)*sampleZoom)>sample->loopStart) {
+                int scaledPos=samplePos+(j*sampleZoom);
+                if (sample->loopStart>=0 && sample->loopStart<(int)sample->samples && scaledPos>=sample->loopStart) {
                   data[i*availX+j]=bgColorLoop;
                 } else {
                   data[i*availX+j]=bgColor;
@@ -1267,6 +1268,36 @@ void FurnaceGUI::drawSampleEdit() {
         }
 
         if (ImGui::IsItemHovered()) {
+          if (ctrlWheeling) {
+            double zoomPercent=100.0/sampleZoom;
+            zoomPercent+=wheelY*10.0;
+            if (zoomPercent>10000.0) zoomPercent=10000.0;
+            if (zoomPercent<1.0) zoomPercent=1.0;
+            sampleZoom=100.0/zoomPercent;
+            if (sampleZoom<0.01) sampleZoom=0.01;
+            sampleZoomAuto=false;
+            int bounds=((int)sample->samples-round(rectSize.x*sampleZoom));
+            if (bounds<0) bounds=0;
+            if (samplePos>bounds) samplePos=bounds;
+            updateSampleTex=true;
+          } else {
+            if (wheelY!=0) {
+              if (!sampleZoomAuto) {
+                double scrollAmount=MAX(fabs((double)wheelY*sampleZoom*60.0),1.0);
+                if (wheelY>0) {
+                  samplePos+=scrollAmount;
+                } else {
+                  samplePos-=scrollAmount;
+                }
+                if (samplePos<0) samplePos=0;
+                int bounds=((int)sample->samples-round(rectSize.x*sampleZoom));
+                if (bounds<0) bounds=0;
+                if (samplePos>bounds) samplePos=bounds;
+                updateSampleTex=true;
+              }
+            }
+          }
+
           int posX=-1;
           int posY=0;
           ImVec2 pos=ImGui::GetMousePos();

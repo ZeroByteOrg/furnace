@@ -77,6 +77,9 @@ void DivPlatformVIC20::acquire(short* bufL, short* bufR, size_t start, size_t le
     vic_sound_machine_calculate_samples(vic,&samp,1,1,0,SAMP_DIVIDER);
     bufL[h]=samp;
     bufR[h]=samp;
+    for (int i=0; i<4; i++) {
+      oscBuf[i]->data[oscBuf[i]->needle++]=vic->ch[i].out?(vic->volume<<11):0;
+    }
   }
 }
 
@@ -120,10 +123,16 @@ void DivPlatformVIC20::tick(bool sysTick) {
       }
     }
     if (chan[i].std.pitch.had) {
+      if (chan[i].std.pitch.mode) {
+        chan[i].pitch2+=chan[i].std.pitch.val;
+        CLAMP_VAR(chan[i].pitch2,-2048,2048);
+      } else {
+        chan[i].pitch2=chan[i].std.pitch.val;
+      }
       chan[i].freqChanged=true;
     }
     if (chan[i].freqChanged || chan[i].keyOn || chan[i].keyOff) {
-      chan[i].freq=parent->calcFreq(chan[i].baseFreq,chan[i].pitch,true)+chan[i].std.pitch.val;
+      chan[i].freq=parent->calcFreq(chan[i].baseFreq,chan[i].pitch,true,0,chan[i].pitch2);
       if (i<3) {
         chan[i].freq>>=(2-i);
       } else {
@@ -158,7 +167,7 @@ void DivPlatformVIC20::tick(bool sysTick) {
 int DivPlatformVIC20::dispatch(DivCommand c) {
   switch (c.cmd) {
     case DIV_CMD_NOTE_ON: {
-      DivInstrument* ins=parent->getIns(chan[c.chan].ins);
+      DivInstrument* ins=parent->getIns(chan[c.chan].ins,DIV_INS_VIC);
       if (c.value!=DIV_NOTE_NULL) {
         chan[c.chan].baseFreq=NOTE_PERIODIC(c.value);
         chan[c.chan].freqChanged=true;
@@ -166,13 +175,13 @@ int DivPlatformVIC20::dispatch(DivCommand c) {
       }
       chan[c.chan].active=true;
       chan[c.chan].keyOn=true;
-      chan[c.chan].std.init(ins);
+      chan[c.chan].macroInit(ins);
       break;
     }
     case DIV_CMD_NOTE_OFF:
       chan[c.chan].active=false;
       chan[c.chan].keyOff=true;
-      chan[c.chan].std.init(NULL);
+      chan[c.chan].macroInit(NULL);
       break;
     case DIV_CMD_NOTE_OFF_ENV:
     case DIV_CMD_ENV_RELEASE:
@@ -232,7 +241,7 @@ int DivPlatformVIC20::dispatch(DivCommand c) {
       break;
     case DIV_CMD_PRE_PORTA:
       if (chan[c.chan].active && c.value2) {
-        if (parent->song.resetMacroOnPorta) chan[c.chan].std.init(parent->getIns(chan[c.chan].ins));
+        if (parent->song.resetMacroOnPorta) chan[c.chan].macroInit(parent->getIns(chan[c.chan].ins,DIV_INS_VIC));
       }
       chan[c.chan].inPorta=c.value;
       break;
@@ -267,6 +276,10 @@ void DivPlatformVIC20::forceIns() {
 
 void* DivPlatformVIC20::getChanState(int ch) {
   return &chan[ch];
+}
+
+DivDispatchOscBuffer* DivPlatformVIC20::getOscBuffer(int ch) {
+  return oscBuf[ch];
 }
 
 unsigned char* DivPlatformVIC20::getRegisterPool() {
@@ -308,6 +321,9 @@ void DivPlatformVIC20::setFlags(unsigned int flags) {
     chipClock=COLOR_NTSC*2.0/7.0;
   }
   rate=chipClock/4;
+  for (int i=0; i<4; i++) {
+    oscBuf[i]->rate=rate;
+  }
 }
 
 void DivPlatformVIC20::poke(unsigned int addr, unsigned short val) {
@@ -324,6 +340,7 @@ int DivPlatformVIC20::init(DivEngine* p, int channels, int sugRate, unsigned int
   skipRegisterWrites=false;
   for (int i=0; i<4; i++) {
     isMuted[i]=false;
+    oscBuf[i]=new DivDispatchOscBuffer;
   }
   setFlags(flags);
   vic=new sound_vic20_t();
@@ -332,6 +349,9 @@ int DivPlatformVIC20::init(DivEngine* p, int channels, int sugRate, unsigned int
 }
 
 void DivPlatformVIC20::quit() {
+  for (int i=0; i<4; i++) {
+    delete oscBuf[i];
+  }
   delete vic;
 }
 

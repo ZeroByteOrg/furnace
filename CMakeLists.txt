@@ -11,6 +11,7 @@ if (APPLE)
 endif()
 
 set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_PROJECT_VERSION_MAJOR 0)
 set(CMAKE_PROJECT_VERSION_MINOR 6)
@@ -237,7 +238,7 @@ extern/adpcm/ymz_codec.c
 extern/Nuked-OPN2/ym3438.c
 extern/opm/opm.c
 extern/Nuked-OPLL/opll.c
-extern/Nuked-OPL3/opl3.c
+extern/opl/opl3.c
 src/engine/platform/sound/sn76496.cpp
 src/engine/platform/sound/ay8910.cpp
 src/engine/platform/sound/saa1099.cpp
@@ -249,6 +250,13 @@ src/engine/platform/sound/nes/fds.c
 src/engine/platform/sound/nes/mmc5.c
 src/engine/platform/sound/vera_psg.c
 src/engine/platform/sound/vera_pcm.c
+
+src/engine/platform/sound/nes_nsfplay/nes_apu.cpp
+src/engine/platform/sound/nes_nsfplay/nes_dmc.cpp
+src/engine/platform/sound/nes_nsfplay/nes_fds.cpp
+src/engine/platform/sound/nes_nsfplay/nes_mmc5.cpp
+src/engine/platform/sound/nes_nsfplay/nes_n106.cpp
+src/engine/platform/sound/nes_nsfplay/nes_vrc6.cpp
 
 src/engine/platform/sound/c64/sid.cc
 src/engine/platform/sound/c64/voice.cc
@@ -283,6 +291,8 @@ src/engine/platform/sound/qsound.c
 src/engine/platform/sound/x1_010/x1_010.cpp
 
 src/engine/platform/sound/swan.cpp
+
+src/engine/platform/sound/su.cpp
 
 src/engine/platform/sound/k005289/k005289.cpp
 
@@ -343,6 +353,7 @@ src/engine/platform/segapcm.cpp
 src/engine/platform/qsound.cpp
 src/engine/platform/x1_010.cpp
 src/engine/platform/lynx.cpp
+src/engine/platform/su.cpp
 src/engine/platform/swan.cpp
 src/engine/platform/vera.cpp
 src/engine/platform/bubsyswsg.cpp
@@ -388,6 +399,7 @@ src/gui/guiConst.cpp
 
 src/gui/about.cpp
 src/gui/channels.cpp
+src/gui/chanOsc.cpp
 src/gui/compatFlags.cpp
 src/gui/cursor.cpp
 src/gui/dataList.cpp
@@ -413,6 +425,7 @@ src/gui/songInfo.cpp
 src/gui/songNotes.cpp
 src/gui/stats.cpp
 src/gui/sysConf.cpp
+src/gui/sysEx.cpp
 src/gui/util.cpp
 src/gui/waveEdit.cpp
 src/gui/volMeter.cpp

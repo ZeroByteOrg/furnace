@@ -44,10 +44,7 @@ SOFTWARE.
 #if defined (__EMSCRIPTEN__) // EMSCRIPTEN
 	#include <emscripten.h>
 #endif // EMSCRIPTEN
-#if defined(__WIN32__) || defined(_WIN32)
-	#ifndef WIN32
-		#define WIN32
-	#endif // WIN32
+#ifdef WIN32
 	#define stat _stat
 	#define stricmp _stricmp
 	#include <cctype>
@@ -3295,7 +3292,8 @@ namespace IGFD
 		const std::string& vFileName,
 		const int& vCountSelectionMax,
 		UserDatas vUserDatas,
-		ImGuiFileDialogFlags vFlags)
+		ImGuiFileDialogFlags vFlags,
+    SelectFun vSelectFun)
 	{
 		if (prFileDialogInternal.puShowDialog) // if already opened, quit
 			return;
@@ -3306,6 +3304,7 @@ namespace IGFD
 		prFileDialogInternal.puDLGtitle = vTitle;
 		prFileDialogInternal.puDLGuserDatas = vUserDatas;
 		prFileDialogInternal.puDLGflags = vFlags;
+    prFileDialogInternal.puDLGselFun = vSelectFun;
 		prFileDialogInternal.puDLGoptionsPane = nullptr;
 		prFileDialogInternal.puDLGoptionsPaneWidth = 0.0f;
 		prFileDialogInternal.puDLGmodal = false;
@@ -3335,7 +3334,8 @@ namespace IGFD
 		const std::string& vFilePathName,
 		const int& vCountSelectionMax,
 		UserDatas vUserDatas,
-		ImGuiFileDialogFlags vFlags)
+		ImGuiFileDialogFlags vFlags,
+    SelectFun vSelectFun)
 	{
 		if (prFileDialogInternal.puShowDialog) // if already opened, quit
 			return;
@@ -3348,6 +3348,7 @@ namespace IGFD
 		prFileDialogInternal.puDLGoptionsPaneWidth = 0.0f;
 		prFileDialogInternal.puDLGuserDatas = vUserDatas;
 		prFileDialogInternal.puDLGflags = vFlags;
+    prFileDialogInternal.puDLGselFun = vSelectFun;
 		prFileDialogInternal.puDLGmodal = false;
 
 		auto ps = IGFD::Utils::ParsePathFileName(vFilePathName);
@@ -3390,7 +3391,8 @@ namespace IGFD
 		const float& vSidePaneWidth,
 		const int& vCountSelectionMax,
 		UserDatas vUserDatas,
-		ImGuiFileDialogFlags vFlags)
+		ImGuiFileDialogFlags vFlags,
+    SelectFun vSelectFun)
 	{
 		if (prFileDialogInternal.puShowDialog) // if already opened, quit
 			return;
@@ -3401,6 +3403,7 @@ namespace IGFD
 		prFileDialogInternal.puDLGtitle = vTitle;
 		prFileDialogInternal.puDLGuserDatas = vUserDatas;
 		prFileDialogInternal.puDLGflags = vFlags;
+    prFileDialogInternal.puDLGselFun = vSelectFun;
 		prFileDialogInternal.puDLGoptionsPane = vSidePane;
 		prFileDialogInternal.puDLGoptionsPaneWidth = vSidePaneWidth;
 		prFileDialogInternal.puDLGmodal = false;
@@ -3435,7 +3438,8 @@ namespace IGFD
 		const float& vSidePaneWidth,
 		const int& vCountSelectionMax,
 		UserDatas vUserDatas,
-		ImGuiFileDialogFlags vFlags)
+		ImGuiFileDialogFlags vFlags,
+    SelectFun vSelectFun)
 	{
 		if (prFileDialogInternal.puShowDialog) // if already opened, quit
 			return;
@@ -3448,6 +3452,7 @@ namespace IGFD
 		prFileDialogInternal.puDLGoptionsPaneWidth = vSidePaneWidth;
 		prFileDialogInternal.puDLGuserDatas = vUserDatas;
 		prFileDialogInternal.puDLGflags = vFlags;
+    prFileDialogInternal.puDLGselFun = vSelectFun;
 		prFileDialogInternal.puDLGmodal = false;
 
 		auto ps = IGFD::Utils::ParsePathFileName(vFilePathName);
@@ -3489,7 +3494,8 @@ namespace IGFD
 		const std::string& vFileName,
 		const int& vCountSelectionMax,
 		UserDatas vUserDatas,
-		ImGuiFileDialogFlags vFlags)
+		ImGuiFileDialogFlags vFlags,
+    SelectFun vSelectFun)
 	{
 		if (prFileDialogInternal.puShowDialog) // if already opened, quit
 			return;
@@ -3497,7 +3503,7 @@ namespace IGFD
 		OpenDialog(
 			vKey, vTitle, vFilters,
 			vPath, vFileName,
-			vCountSelectionMax, vUserDatas, vFlags);
+			vCountSelectionMax, vUserDatas, vFlags, vSelectFun);
 
 		prFileDialogInternal.puDLGmodal = true;
 	}
@@ -3509,7 +3515,8 @@ namespace IGFD
 		const std::string& vFilePathName,
 		const int& vCountSelectionMax,
 		UserDatas vUserDatas,
-		ImGuiFileDialogFlags vFlags)
+		ImGuiFileDialogFlags vFlags,
+    SelectFun vSelectFun)
 	{
 		if (prFileDialogInternal.puShowDialog) // if already opened, quit
 			return;
@@ -3517,7 +3524,7 @@ namespace IGFD
 		OpenDialog(
 			vKey, vTitle, vFilters,
 			vFilePathName,
-			vCountSelectionMax, vUserDatas, vFlags);
+			vCountSelectionMax, vUserDatas, vFlags, vSelectFun);
 
 		prFileDialogInternal.puDLGmodal = true;
 	}
@@ -3534,7 +3541,8 @@ namespace IGFD
 		const float& vSidePaneWidth,
 		const int& vCountSelectionMax,
 		UserDatas vUserDatas,
-		ImGuiFileDialogFlags vFlags)
+		ImGuiFileDialogFlags vFlags,
+    SelectFun vSelectFun)
 	{
 		if (prFileDialogInternal.puShowDialog) // if already opened, quit
 			return;
@@ -3543,7 +3551,7 @@ namespace IGFD
 			vKey, vTitle, vFilters,
 			vPath, vFileName,
 			vSidePane, vSidePaneWidth,
-			vCountSelectionMax, vUserDatas, vFlags);
+			vCountSelectionMax, vUserDatas, vFlags, vSelectFun);
 
 		prFileDialogInternal.puDLGmodal = true;
 	}
@@ -3559,7 +3567,8 @@ namespace IGFD
 		const float& vSidePaneWidth,
 		const int& vCountSelectionMax,
 		UserDatas vUserDatas,
-		ImGuiFileDialogFlags vFlags)
+		ImGuiFileDialogFlags vFlags,
+    SelectFun vSelectFun)
 	{
 		if (prFileDialogInternal.puShowDialog) // if already opened, quit
 			return;
@@ -3568,7 +3577,7 @@ namespace IGFD
 			vKey, vTitle, vFilters,
 			vFilePathName,
 			vSidePane, vSidePaneWidth,
-			vCountSelectionMax, vUserDatas, vFlags);
+			vCountSelectionMax, vUserDatas, vFlags, vSelectFun);
 
 		prFileDialogInternal.puDLGmodal = true;
 	}
@@ -3940,6 +3949,9 @@ namespace IGFD
           return 2;
         } else {
 				  fdi.SelectFileName(prFileDialogInternal, vInfos);
+          if (prFileDialogInternal.puDLGselFun!=NULL) {
+            prFileDialogInternal.puDLGselFun(GetFilePathName().c_str());
+          }
         }
 			}
 		}

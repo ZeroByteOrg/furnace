@@ -142,7 +142,7 @@ const char* DivPlatformLynx::getEffectName(unsigned char effect) {
 }
 
 void DivPlatformLynx::acquire(short* bufL, short* bufR, size_t start, size_t len) {
-  mikey->sampleAudio( bufL + start, bufR + start, len );
+  mikey->sampleAudio( bufL + start, bufR + start, len, oscBuf );
 }
 
 void DivPlatformLynx::tick(bool sysTick) {
@@ -186,6 +186,12 @@ void DivPlatformLynx::tick(bool sysTick) {
     }
 
     if (chan[i].std.pitch.had) {
+      if (chan[i].std.pitch.mode) {
+        chan[i].pitch2+=chan[i].std.pitch.val;
+        CLAMP_VAR(chan[i].pitch2,-2048,2048);
+      } else {
+        chan[i].pitch2=chan[i].std.pitch.val;
+      }
       chan[i].freqChanged=true;
     }
 
@@ -195,7 +201,7 @@ void DivPlatformLynx::tick(bool sysTick) {
         WRITE_OTHER(i, ((chan[i].lfsr&0xf00)>>4));
         chan[i].lfsr=-1;
       }
-      chan[i].fd=parent->calcFreq(chan[i].baseFreq,chan[i].pitch,true)+chan[i].std.pitch.val;
+      chan[i].fd=parent->calcFreq(chan[i].baseFreq,chan[i].pitch,true,0,chan[i].pitch2);
       if (chan[i].std.duty.had) {
         chan[i].duty=chan[i].std.duty.val;
         WRITE_FEEDBACK(i, chan[i].duty.feedback);
@@ -224,12 +230,12 @@ int DivPlatformLynx::dispatch(DivCommand c) {
       }
       chan[c.chan].active=true;
       WRITE_VOLUME(c.chan,(isMuted[c.chan]?0:(chan[c.chan].vol&127)));
-      chan[c.chan].std.init(parent->getIns(chan[c.chan].ins));
+      chan[c.chan].macroInit(parent->getIns(chan[c.chan].ins,DIV_INS_MIKEY));
       break;
     case DIV_CMD_NOTE_OFF:
       chan[c.chan].active=false;
       WRITE_VOLUME(c.chan, 0);
-      chan[c.chan].std.init(NULL);
+      chan[c.chan].macroInit(NULL);
       break;
     case DIV_CMD_LYNX_LFSR_LOAD:
       chan[c.chan].freqChanged=true;
@@ -241,7 +247,7 @@ int DivPlatformLynx::dispatch(DivCommand c) {
       break;
     case DIV_CMD_INSTRUMENT:
       chan[c.chan].ins=c.value;
-      //chan[c.chan].std.init(parent->getIns(chan[c.chan].ins));
+      //chan[c.chan].macroInit(parent->getIns(chan[c.chan].ins,DIV_INS_MIKEY));
       break;
     case DIV_CMD_VOLUME:
       if (chan[c.chan].vol!=c.value) {
@@ -253,7 +259,7 @@ int DivPlatformLynx::dispatch(DivCommand c) {
       }
       break;
     case DIV_CMD_PANNING:
-      chan[c.chan].pan=c.value;
+      chan[c.chan].pan=(c.value&0xf0)|(c.value2>>4);
       WRITE_ATTEN(c.chan,chan[c.chan].pan);
       break;
     case DIV_CMD_GET_VOLUME:
@@ -297,7 +303,7 @@ int DivPlatformLynx::dispatch(DivCommand c) {
       break;
     case DIV_CMD_PRE_PORTA:
       if (chan[c.chan].active && c.value2) {
-        if (parent->song.resetMacroOnPorta) chan[c.chan].std.init(parent->getIns(chan[c.chan].ins));
+        if (parent->song.resetMacroOnPorta) chan[c.chan].macroInit(parent->getIns(chan[c.chan].ins,DIV_INS_MIKEY));
       }
       chan[c.chan].inPorta=c.value;
       break;
@@ -334,6 +340,10 @@ void DivPlatformLynx::forceIns() {
 
 void* DivPlatformLynx::getChanState(int ch) {
   return &chan[ch];
+}
+
+DivDispatchOscBuffer* DivPlatformLynx::getOscBuffer(int ch) {
+  return oscBuf[ch];
 }
 
 unsigned char* DivPlatformLynx::getRegisterPool()
@@ -392,16 +402,24 @@ int DivPlatformLynx::init(DivEngine* p, int channels, int sugRate, unsigned int 
 
   for (int i=0; i<4; i++) {
     isMuted[i]=false;
+    oscBuf[i]=new DivDispatchOscBuffer;
   }
 
   chipClock = 16000000;
   rate = chipClock/128;
+
+  for (int i=0; i<4; i++) {
+    oscBuf[i]->rate=rate;
+  }
 
   reset();
   return 4;
 }
 
 void DivPlatformLynx::quit() {
+  for (int i=0; i<4; i++) {
+    delete oscBuf[i];
+  }
   mikey.reset();
 }
 
