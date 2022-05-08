@@ -101,8 +101,8 @@ void ZSM::setLoopPoint() {
   logI("ZSM: loop at file offset %d bytes",w->tell());
   loopOffset=w->tell()-ZSM_MAGIC_HDR_SIZE;
   w->seek(0+ZSM_MAGIC_HDR_SIZE,SEEK_SET);
-  w->writeS((short)(loopOffset%0x2000));
-  w->writeC((short)loopOffset/0x2000);
+  w->writeS((short)(loopOffset&0xffff));
+  w->writeC((short)((loopOffset>>16)&0xff));
   w->seek(loopOffset+ZSM_MAGIC_HDR_SIZE,SEEK_SET);
   memset(&psgState,-1,sizeof(psgState));
 }
@@ -113,6 +113,8 @@ SafeWriter* ZSM::finish() {
   w->writeC(ZSM_EOF);
   // todo: put PCM offset/data writes here once defined in ZSM standard.
   // todo: set channel-use bitmasks in header
+  //       -- really need to do it because player STOP does not
+  //       -- mute voices otherwise!
   return w;
 }
 
