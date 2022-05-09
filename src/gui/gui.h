@@ -770,7 +770,7 @@ class FurnaceGUI {
   String mmlString[17];
   String mmlStringW;
 
-  bool quit, warnQuit, willCommit, edit, modified, displayError, displayExporting, vgmExportLoop, zsmExportLoop, wantCaptureKeyboard;
+  bool quit, warnQuit, willCommit, edit, modified, displayError, displayExporting, vgmExportLoop, zsmExportLoop, wantCaptureKeyboard, displayMacroMenu;
   bool displayNew, fullScreen, preserveChanPos;
   bool willExport[32];
   int vgmExportVersion;
@@ -1007,7 +1007,7 @@ class FurnaceGUI {
   */
 
   SelectionPoint selStart, selEnd, cursor;
-  bool selecting, curNibble, orderNibble, followOrders, followPattern, changeAllOrders;
+  bool selecting, curNibble, orderNibble, followOrders, followPattern, changeAllOrders, mobileUI;
   bool collapseWindow, demandScrollX, fancyPattern, wantPatName, firstFrame, tempoView, waveHex, lockLayout, editOptsVisible, latchNibble, nonLatchNibble;
   FurnaceGUIWindows curWindow, nextWindow, curWindowLast;
   float peak[2];
@@ -1083,8 +1083,13 @@ class FurnaceGUI {
   bool macroDragInitialValue;
   bool macroDragChar;
   bool macroDragLineMode;
+  bool macroDragMouseMoved;
   ImVec2 macroDragLineInitial;
+  ImVec2 macroDragLineInitialV;
   bool macroDragActive;
+  FurnaceGUIMacroDesc lastMacroDesc;
+  int macroOffX, macroOffY;
+  float macroScaleX, macroScaleY;
 
   ImVec2 macroLoopDragStart;
   ImVec2 macroLoopDragAreaSize;
@@ -1105,7 +1110,7 @@ class FurnaceGUI {
   float nextScroll, nextAddScroll;
 
   ImVec2 patWindowPos, patWindowSize;
-  
+
   // pattern view specific
   ImVec2 threeChars, twoChars;
   SelectionPoint sel1, sel2;
@@ -1158,7 +1163,7 @@ class FurnaceGUI {
   // visualizer
   float keyHit[DIV_MAX_CHANS];
   int lastIns[DIV_MAX_CHANS];
-  
+
   // log window
   bool followLog;
 

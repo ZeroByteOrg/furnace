@@ -1155,6 +1155,9 @@ void FurnaceGUI::drawMacros(std::vector<FurnaceGUIMacroDesc>& macros) {
         if (i.macro->name=="arp") {
           i.macro->vZoom=24;
           i.macro->vScroll=120-12;
+        } else if (i.macro->name=="pitch") {
+          i.macro->vZoom=64;
+          i.macro->vScroll=1024-32;
         } else {
           i.macro->vZoom=i.max-i.min;
           i.macro->vScroll=0;
@@ -1189,6 +1192,7 @@ void FurnaceGUI::drawMacros(std::vector<FurnaceGUIMacroDesc>& macros) {
         macroDragChar=false;
         macroDragLineMode=(i.isBitfield)?false:ImGui::IsItemClicked(ImGuiMouseButton_Right);
         macroDragLineInitial=ImVec2(0,0);
+        lastMacroDesc=i;
         processDrags(ImGui::GetMousePos().x,ImGui::GetMousePos().y);
       }
       if (i.macro->open) {
@@ -1385,6 +1389,48 @@ void FurnaceGUI::drawInsEdit() {
           for (DivInstrumentType i: e->getPossibleInsTypes()) {
             if (ImGui::Selectable(insTypes[i],insType==i)) {
               ins->type=i;
+
+              // reset macro zoom
+              ins->std.volMacro.vZoom=-1;
+              ins->std.dutyMacro.vZoom=-1;
+              ins->std.waveMacro.vZoom=-1;
+              ins->std.ex1Macro.vZoom=-1;
+              ins->std.ex2Macro.vZoom=-1;
+              ins->std.ex3Macro.vZoom=-1;
+              ins->std.ex4Macro.vZoom=-1;
+              ins->std.ex5Macro.vZoom=-1;
+              ins->std.ex6Macro.vZoom=-1;
+              ins->std.ex7Macro.vZoom=-1;
+              ins->std.ex8Macro.vZoom=-1;
+              ins->std.panLMacro.vZoom=-1;
+              ins->std.panRMacro.vZoom=-1;
+              ins->std.phaseResetMacro.vZoom=-1;
+              ins->std.algMacro.vZoom=-1;
+              ins->std.fbMacro.vZoom=-1;
+              ins->std.fmsMacro.vZoom=-1;
+              ins->std.amsMacro.vZoom=-1;
+              for (int j=0; j<4; j++) {
+                ins->std.opMacros[j].amMacro.vZoom=-1;
+                ins->std.opMacros[j].arMacro.vZoom=-1;
+                ins->std.opMacros[j].drMacro.vZoom=-1;
+                ins->std.opMacros[j].multMacro.vZoom=-1;
+                ins->std.opMacros[j].rrMacro.vZoom=-1;
+                ins->std.opMacros[j].slMacro.vZoom=-1;
+                ins->std.opMacros[j].tlMacro.vZoom=-1;
+                ins->std.opMacros[j].dt2Macro.vZoom=-1;
+                ins->std.opMacros[j].rsMacro.vZoom=-1;
+                ins->std.opMacros[j].dtMacro.vZoom=-1;
+                ins->std.opMacros[j].d2rMacro.vZoom=-1;
+                ins->std.opMacros[j].ssgMacro.vZoom=-1;
+                ins->std.opMacros[j].damMacro.vZoom=-1;
+                ins->std.opMacros[j].dvbMacro.vZoom=-1;
+                ins->std.opMacros[j].egtMacro.vZoom=-1;
+                ins->std.opMacros[j].kslMacro.vZoom=-1;
+                ins->std.opMacros[j].susMacro.vZoom=-1;
+                ins->std.opMacros[j].vibMacro.vZoom=-1;
+                ins->std.opMacros[j].wsMacro.vZoom=-1;
+                ins->std.opMacros[j].ksrMacro.vZoom=-1;
+              }
             }
           }
           ImGui::EndCombo();
@@ -3077,6 +3123,110 @@ void FurnaceGUI::drawInsEdit() {
       if (settings.insEditColorize) {
         popAccentColors();
       }
+    }
+    if (displayMacroMenu) {
+      displayMacroMenu=false;
+      if (lastMacroDesc.macro!=NULL) {
+        ImGui::OpenPopup("macroMenu");
+      }
+    }
+    if (ImGui::BeginPopup("macroMenu",ImGuiWindowFlags_NoMove|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoSavedSettings)) {
+      if (ImGui::MenuItem("copy")) {
+        String mmlStr;
+        encodeMMLStr(mmlStr,lastMacroDesc.macro->val,lastMacroDesc.macro->len,lastMacroDesc.macro->loop,lastMacroDesc.macro->rel);
+        SDL_SetClipboardText(mmlStr.c_str());
+      }
+      if (ImGui::MenuItem("paste")) {
+        String mmlStr;
+        char* clipText=SDL_GetClipboardText();
+        if (clipText!=NULL) {
+          if (clipText[0]) {
+            mmlStr=clipText;
+          }
+          SDL_free(clipText);
+        }
+        if (!mmlStr.empty()) {
+          decodeMMLStr(mmlStr,lastMacroDesc.macro->val,lastMacroDesc.macro->len,lastMacroDesc.macro->loop,lastMacroDesc.min,(lastMacroDesc.isBitfield)?((1<<(lastMacroDesc.isBitfield?lastMacroDesc.max:0))-1):lastMacroDesc.max,lastMacroDesc.macro->rel);
+        }
+      }
+      ImGui::Separator();
+      if (ImGui::MenuItem("clear")) {
+        lastMacroDesc.macro->len=0;
+        lastMacroDesc.macro->loop=-1;
+        lastMacroDesc.macro->rel=-1;
+        for (int i=0; i<256; i++) {
+          lastMacroDesc.macro->val[i]=0;
+        }
+      }
+      if (ImGui::MenuItem("clear contents")) {
+        for (int i=0; i<256; i++) {
+          lastMacroDesc.macro->val[i]=0;
+        }
+      }
+      ImGui::Separator();
+      if (ImGui::BeginMenu("offset...")) {
+        ImGui::InputInt("X",&macroOffX,1,10);
+        ImGui::InputInt("Y",&macroOffY,1,10);
+        if (ImGui::Button("offset")) {
+          int oldData[256];
+          memset(oldData,0,256*sizeof(int));
+          memcpy(oldData,lastMacroDesc.macro->val,lastMacroDesc.macro->len*sizeof(int));
+
+          for (int i=0; i<lastMacroDesc.macro->len; i++) {
+            int val=0;
+            if ((i-macroOffX)>=0 && (i-macroOffX)<lastMacroDesc.macro->len) {
+              val=oldData[i-macroOffX]+macroOffY;
+              if (val<lastMacroDesc.min) val=lastMacroDesc.min;
+              if (val>lastMacroDesc.max) val=lastMacroDesc.max;
+            }
+            lastMacroDesc.macro->val[i]=val;
+          }
+
+          if (lastMacroDesc.macro->loop>=0 && lastMacroDesc.macro->loop<lastMacroDesc.macro->len) {
+            lastMacroDesc.macro->loop+=macroOffX;
+          } else {
+            lastMacroDesc.macro->loop=-1;
+          }
+          if ((lastMacroDesc.macro->rel+macroOffX)>=0 && (lastMacroDesc.macro->rel+macroOffX)<lastMacroDesc.macro->len) {
+            lastMacroDesc.macro->rel+=macroOffX;
+          } else {
+            lastMacroDesc.macro->rel=-1;
+          }
+
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndMenu();
+      }
+      if (ImGui::BeginMenu("scale...")) {
+        if (ImGui::InputFloat("X",&macroScaleX,1.0f,10.0f,"%.2f%%")) {
+          if (macroScaleX<0.1) macroScaleX=0.1;
+          if (macroScaleX>12800.0) macroScaleX=12800.0;
+        }
+        ImGui::InputFloat("Y",&macroScaleY,1.0f,10.0f,"%.2f%%");
+        if (ImGui::Button("scale")) {
+          int oldData[256];
+          memset(oldData,0,256*sizeof(int));
+          memcpy(oldData,lastMacroDesc.macro->val,lastMacroDesc.macro->len*sizeof(int));
+
+          lastMacroDesc.macro->len=MIN(128,((double)lastMacroDesc.macro->len*(macroScaleX/100.0)));
+
+          for (int i=0; i<lastMacroDesc.macro->len; i++) {
+            int val=0;
+            double posX=round((double)i*(100.0/macroScaleX)-0.01);
+            if (posX>=0 && posX<lastMacroDesc.macro->len) {
+              val=round((double)oldData[(int)posX]*(macroScaleY/100.0));
+              if (val<lastMacroDesc.min) val=lastMacroDesc.min;
+              if (val>lastMacroDesc.max) val=lastMacroDesc.max;
+            }
+            lastMacroDesc.macro->val[i]=val;
+          }
+
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndMenu();
+      }
+      
+      ImGui::EndPopup();
     }
   }
   if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) curWindow=GUI_WINDOW_INS_EDIT;
