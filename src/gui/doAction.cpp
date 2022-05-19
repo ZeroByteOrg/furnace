@@ -25,6 +25,11 @@
 #include "actionUtil.h"
 #include "sampleUtil.h"
 
+const unsigned char avRequest[15]={
+  0xf0, 0x43, 0x20, 0x7e, 0x4c, 0x4d, 0x20, 0x20, 0x38, 0x39, 0x37, 0x36, 0x41, 0x45, 0xf7
+};
+
+
 void FurnaceGUI::doAction(int what) {
   switch (what) {
     case GUI_ACTION_OPEN:
@@ -141,6 +146,17 @@ void FurnaceGUI::doAction(int what) {
       fullScreen=!fullScreen;
       SDL_SetWindowFullscreen(sdlWin,fullScreen?(SDL_WINDOW_FULLSCREEN|SDL_WINDOW_FULLSCREEN_DESKTOP):0);
       break;
+    case GUI_ACTION_TX81Z_REQUEST: {
+      TAMidiMessage msg;
+      msg.type=TA_MIDI_SYSEX;
+      msg.sysExData.reset(new unsigned char[15]);
+      msg.sysExLen=15;
+      memcpy(msg.sysExData.get(),avRequest,15);
+      if (!e->sendMidiMessage(msg)) {
+        showError("Error while sending request (MIDI output not configured?)");
+      }
+      break;
+    }
     case GUI_ACTION_PANIC:
       e->syncReset();
       break;
@@ -454,7 +470,7 @@ void FurnaceGUI::doAction(int what) {
       e->unmuteAll();
       break;
     case GUI_ACTION_PAT_NEXT_ORDER:
-      if (curOrder<e->song.ordersLen-1) {
+      if (curOrder<e->curSubSong->ordersLen-1) {
         setOrder(curOrder+1);
       }
       break;
@@ -465,21 +481,21 @@ void FurnaceGUI::doAction(int what) {
       break;
     case GUI_ACTION_PAT_COLLAPSE:
       if (cursor.xCoarse<0 || cursor.xCoarse>=e->getTotalChannelCount()) break;
-      if (e->song.chanCollapse[cursor.xCoarse]==0) {
-        e->song.chanCollapse[cursor.xCoarse]=3;
-      } else if (e->song.chanCollapse[cursor.xCoarse]>0) {
-        e->song.chanCollapse[cursor.xCoarse]--;
+      if (e->curSubSong->chanCollapse[cursor.xCoarse]==0) {
+        e->curSubSong->chanCollapse[cursor.xCoarse]=3;
+      } else if (e->curSubSong->chanCollapse[cursor.xCoarse]>0) {
+        e->curSubSong->chanCollapse[cursor.xCoarse]--;
       }
       break;
     case GUI_ACTION_PAT_INCREASE_COLUMNS:
       if (cursor.xCoarse<0 || cursor.xCoarse>=e->getTotalChannelCount()) break;
-      e->song.pat[cursor.xCoarse].effectCols++;
-              if (e->song.pat[cursor.xCoarse].effectCols>8) e->song.pat[cursor.xCoarse].effectCols=8;
+      e->curPat[cursor.xCoarse].effectCols++;
+              if (e->curPat[cursor.xCoarse].effectCols>8) e->curPat[cursor.xCoarse].effectCols=8;
       break;
     case GUI_ACTION_PAT_DECREASE_COLUMNS:
       if (cursor.xCoarse<0 || cursor.xCoarse>=e->getTotalChannelCount()) break;
-      e->song.pat[cursor.xCoarse].effectCols--;
-      if (e->song.pat[cursor.xCoarse].effectCols<1) e->song.pat[cursor.xCoarse].effectCols=1;
+      e->curPat[cursor.xCoarse].effectCols--;
+      if (e->curPat[cursor.xCoarse].effectCols<1) e->curPat[cursor.xCoarse].effectCols=1;
       break;
     case GUI_ACTION_PAT_INTERPOLATE:
       doInterpolate();
@@ -509,14 +525,22 @@ void FurnaceGUI::doAction(int what) {
 
     case GUI_ACTION_INS_LIST_ADD:
       curIns=e->addInstrument(cursor.xCoarse);
-      MARK_MODIFIED;
+      if (curIns==-1) {
+        showError("too many instruments!");
+      } else {
+        MARK_MODIFIED;
+      }
       break;
     case GUI_ACTION_INS_LIST_DUPLICATE:
       if (curIns>=0 && curIns<(int)e->song.ins.size()) {
         int prevIns=curIns;
         curIns=e->addInstrument(cursor.xCoarse);
-        (*e->song.ins[curIns])=(*e->song.ins[prevIns]);
-        MARK_MODIFIED;
+        if (curIns==-1) {
+          showError("too many instruments!");
+        } else {
+          (*e->song.ins[curIns])=(*e->song.ins[prevIns]);
+          MARK_MODIFIED;
+        }
       }
       break;
     case GUI_ACTION_INS_LIST_OPEN:
@@ -555,14 +579,22 @@ void FurnaceGUI::doAction(int what) {
     
     case GUI_ACTION_WAVE_LIST_ADD:
       curWave=e->addWave();
-      MARK_MODIFIED;
+      if (curWave==-1) {
+        showError("too many wavetables!");
+      } else {
+        MARK_MODIFIED;
+      }
       break;
     case GUI_ACTION_WAVE_LIST_DUPLICATE:
       if (curWave>=0 && curWave<(int)e->song.wave.size()) {
         int prevWave=curWave;
         curWave=e->addWave();
-        (*e->song.wave[curWave])=(*e->song.wave[prevWave]);
-        MARK_MODIFIED;
+        if (curWave==-1) {
+          showError("too many wavetables!");
+        } else {
+          (*e->song.wave[curWave])=(*e->song.wave[prevWave]);
+          MARK_MODIFIED;
+        }
       }
       break;
     case GUI_ACTION_WAVE_LIST_OPEN:
@@ -598,31 +630,39 @@ void FurnaceGUI::doAction(int what) {
 
     case GUI_ACTION_SAMPLE_LIST_ADD:
       curSample=e->addSample();
+      if (curSample==-1) {
+        showError("too many samples!");
+      } else {
+        MARK_MODIFIED;
+      }
       updateSampleTex=true;
-      MARK_MODIFIED;
       break;
     case GUI_ACTION_SAMPLE_LIST_DUPLICATE:
       if (curSample>=0 && curSample<(int)e->song.sample.size()) {
         DivSample* prevSample=e->getSample(curSample);
         curSample=e->addSample();
-        updateSampleTex=true;
-        e->lockEngine([this,prevSample]() {
-          DivSample* sample=e->getSample(curSample);
-          if (sample!=NULL) {
-            sample->rate=prevSample->rate;
-            sample->centerRate=prevSample->centerRate;
-            sample->name=prevSample->name;
-            sample->loopStart=prevSample->loopStart;
-            sample->depth=prevSample->depth;
-            if (sample->init(prevSample->samples)) {
-              if (prevSample->getCurBuf()!=NULL) {
-                memcpy(sample->getCurBuf(),prevSample->getCurBuf(),prevSample->getCurBufLen());
+        if (curSample==-1) {
+          showError("too many samples!");
+        } else {
+          e->lockEngine([this,prevSample]() {
+            DivSample* sample=e->getSample(curSample);
+            if (sample!=NULL) {
+              sample->rate=prevSample->rate;
+              sample->centerRate=prevSample->centerRate;
+              sample->name=prevSample->name;
+              sample->loopStart=prevSample->loopStart;
+              sample->depth=prevSample->depth;
+              if (sample->init(prevSample->samples)) {
+                if (prevSample->getCurBuf()!=NULL) {
+                  memcpy(sample->getCurBuf(),prevSample->getCurBuf(),prevSample->getCurBufLen());
+                }
               }
             }
-          }
-          e->renderSamples();
-        });
-        MARK_MODIFIED;
+            e->renderSamples();
+          });
+          MARK_MODIFIED;
+        }
+        updateSampleTex=true;
       }
       break;
     case GUI_ACTION_SAMPLE_LIST_OPEN:
@@ -1138,11 +1178,15 @@ void FurnaceGUI::doAction(int what) {
       if (curSample<0 || curSample>=(int)e->song.sample.size()) break;
       DivSample* sample=e->song.sample[curSample];
       curIns=e->addInstrument(cursor.xCoarse);
-      e->song.ins[curIns]->type=DIV_INS_AMIGA;
-      e->song.ins[curIns]->name=sample->name;
-      e->song.ins[curIns]->amiga.initSample=curSample;
-      nextWindow=GUI_WINDOW_INS_EDIT;
-      MARK_MODIFIED;
+      if (curIns==-1) {
+        showError("too many instruments!");
+      } else {
+        e->song.ins[curIns]->type=DIV_INS_AMIGA;
+        e->song.ins[curIns]->name=sample->name;
+        e->song.ins[curIns]->amiga.initSample=curSample;
+        nextWindow=GUI_WINDOW_INS_EDIT;
+        MARK_MODIFIED;
+      }
       break;
     }
 
@@ -1152,7 +1196,7 @@ void FurnaceGUI::doAction(int what) {
       }
       break;
     case GUI_ACTION_ORDERS_DOWN:
-      if (curOrder<e->song.ordersLen-1) {
+      if (curOrder<e->curSubSong->ordersLen-1) {
         setOrder(curOrder+1);
       }
       break;
@@ -1165,7 +1209,7 @@ void FurnaceGUI::doAction(int what) {
           orderCursor=firstChannel;
           break;
         }
-      } while (!e->song.chanShow[orderCursor]);
+      } while (!e->curSubSong->chanShow[orderCursor]);
       break;
     }
     case GUI_ACTION_ORDERS_RIGHT: {
@@ -1177,20 +1221,20 @@ void FurnaceGUI::doAction(int what) {
           orderCursor=lastChannel-1;
           break;
         }
-      } while (!e->song.chanShow[orderCursor]);
+      } while (!e->curSubSong->chanShow[orderCursor]);
       break;
     }
     case GUI_ACTION_ORDERS_INCREASE: {
       if (orderCursor<0 || orderCursor>=e->getTotalChannelCount()) break;
-      if (e->song.orders.ord[orderCursor][curOrder]<0x7f) {
-        e->song.orders.ord[orderCursor][curOrder]++;
+      if (e->curOrders->ord[orderCursor][curOrder]<0x7f) {
+        e->curOrders->ord[orderCursor][curOrder]++;
       }
       break;
     }
     case GUI_ACTION_ORDERS_DECREASE: {
       if (orderCursor<0 || orderCursor>=e->getTotalChannelCount()) break;
-      if (e->song.orders.ord[orderCursor][curOrder]>0) {
-        e->song.orders.ord[orderCursor][curOrder]--;
+      if (e->curOrders->ord[orderCursor][curOrder]>0) {
+        e->curOrders->ord[orderCursor][curOrder]--;
       }
       break;
     }

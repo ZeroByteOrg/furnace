@@ -409,6 +409,13 @@ void DivEngine::performVGMWrite(SafeWriter* w, DivSystem sys, DivRegWrite& write
         w->writeC(0x04);
         w->writeC(0x00);
         break;
+      case DIV_SYSTEM_SCC:
+      case DIV_SYSTEM_SCC_PLUS:
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|3);
+        w->writeC(0);
+        w->writeC(0);
+        break;
       default:
         break;
     }
@@ -530,6 +537,11 @@ void DivEngine::performVGMWrite(SafeWriter* w, DivSystem sys, DivRegWrite& write
           break;
       }
       break;
+    case DIV_SYSTEM_OPN:
+      w->writeC(5|baseAddr1);
+      w->writeC(write.addr&0xff);
+      w->writeC(write.val);
+      break;
     case DIV_SYSTEM_OPLL:
     case DIV_SYSTEM_OPLL_DRUMS:
     case DIV_SYSTEM_VRC7:
@@ -596,6 +608,71 @@ void DivEngine::performVGMWrite(SafeWriter* w, DivSystem sys, DivRegWrite& write
           w->writeC(write.addr&0xff);
           w->writeC(write.val);
           break;
+      }
+      break;
+    case DIV_SYSTEM_SCC:
+      if (write.addr<0x80) {
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|0);
+        w->writeC(write.addr&0x7f);
+        w->writeC(write.val&0xff);
+      } else if (write.addr<0x8a) {
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|1);
+        w->writeC((write.addr-0x80)&0x7f);
+        w->writeC(write.val&0xff);
+      } else if (write.addr<0x8f) {
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|2);
+        w->writeC((write.addr-0x8a)&0x7f);
+        w->writeC(write.val&0xff);
+      } else if (write.addr<0x90) {
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|3);
+        w->writeC((write.addr-0x8f)&0x7f);
+        w->writeC(write.val&0xff);
+      } else if (write.addr>=0xe0) {
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|5);
+        w->writeC((write.addr-0xe0)&0x7f);
+        w->writeC(write.val&0xff);
+      } else {
+        logW("SCC: writing to unmapped address %.2x!",write.addr);
+      }
+      break;
+    case DIV_SYSTEM_SCC_PLUS:
+      if (write.addr<0x80) {
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|0);
+        w->writeC(write.addr&0x7f);
+        w->writeC(write.val&0xff);
+      } else if (write.addr<0xa0) {
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|4);
+        w->writeC(write.addr);
+        w->writeC(write.val&0xff);
+      } else if (write.addr<0xaa) {
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|1);
+        w->writeC((write.addr-0xa0)&0x7f);
+        w->writeC(write.val&0xff);
+      } else if (write.addr<0xaf) {
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|2);
+        w->writeC((write.addr-0xaa)&0x7f);
+        w->writeC(write.val&0xff);
+      } else if (write.addr<0xb0) {
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|3);
+        w->writeC((write.addr-0xaf)&0x7f);
+        w->writeC(write.val&0xff);
+      } else if (write.addr>=0xe0) {
+        w->writeC(0xd2);
+        w->writeC(baseAddr2|5);
+        w->writeC((write.addr-0xe0)&0x7f);
+        w->writeC(write.val&0xff);
+      } else {
+        logW("SCC+: writing to unmapped address %.2x!",write.addr);
       }
       break;
     default:
@@ -836,11 +913,41 @@ SafeWriter* DivEngine::saveVGM(bool* sysToExport, bool loop, int version) {
         }
         break;
       case DIV_SYSTEM_AY8910:
-      case DIV_SYSTEM_AY8930:
+      case DIV_SYSTEM_AY8930: {
         if (!hasAY) {
+          bool hasClockDivider=false; // Configurable clock divider
+          bool hasStereo=true; // Stereo
           hasAY=disCont[i].dispatch->chipClock;
-          ayConfig=(song.system[i]==DIV_SYSTEM_AY8930)?3:0;
           ayFlags=1;
+          if (song.system[i]==DIV_SYSTEM_AY8930) { // AY8930
+            ayConfig=0x03;
+            hasClockDivider=true;
+          } else {
+            switch ((song.systemFlags[i]>>4)&3) {
+              default:
+              case 0: // AY8910
+                ayConfig=0x00;
+                break;
+              case 1: // YM2149
+                ayConfig=0x10;
+                hasClockDivider=true;
+                break;
+              case 2: // Sunsoft 5B
+                ayConfig=0x10;
+                ayFlags|=0x12; // Clock internally divided, Single sound output
+                hasStereo=false; // due to above, can't be per-channel stereo configurable
+                break;
+              case 3: // AY8914
+                ayConfig=0x04;
+                break;
+            }
+          }
+          if (hasClockDivider && ((song.systemFlags[i]>>7)&1)) {
+            ayFlags|=0x10;
+          }
+          if (hasStereo && ((song.systemFlags[i]>>6)&1)) {
+            ayFlags|=0x80;
+          }
           willExport[i]=true;
         } else if (!(hasAY&0x40000000)) {
           isSecond[i]=true;
@@ -849,6 +956,7 @@ SafeWriter* DivEngine::saveVGM(bool* sysToExport, bool loop, int version) {
           howManyChips++;
         }
         break;
+      }
       case DIV_SYSTEM_SAA1099:
         if (!hasSAA) {
           hasSAA=disCont[i].dispatch->chipClock;
@@ -881,6 +989,18 @@ SafeWriter* DivEngine::saveVGM(bool* sysToExport, bool loop, int version) {
           isSecond[i]=true;
           willExport[i]=true;
           hasOPM|=0x40000000;
+          howManyChips++;
+        }
+        break;
+      case DIV_SYSTEM_OPN:
+        if (!hasOPN) {
+          hasOPN=disCont[i].dispatch->chipClock;
+          willExport[i]=true;
+          writeDACSamples=true;
+        } else if (!(hasOPN&0x40000000)) {
+          isSecond[i]=true;
+          willExport[i]=true;
+          hasOPN|=0x40000000;
           howManyChips++;
         }
         break;
@@ -985,6 +1105,24 @@ SafeWriter* DivEngine::saveVGM(bool* sysToExport, bool loop, int version) {
           isSecond[i]=true;
           willExport[i]=true;
           hasOPL3|=0x40000000;
+          howManyChips++;
+        }
+        break;
+      case DIV_SYSTEM_SCC:
+      case DIV_SYSTEM_SCC_PLUS:
+        if (!hasK051649) {
+          hasK051649=disCont[i].dispatch->chipClock;
+          if (song.system[i]==DIV_SYSTEM_SCC_PLUS) {
+            hasK051649|=0x80000000;
+          }
+          willExport[i]=true;
+        } else if (!(hasK051649&0x40000000)) {
+          isSecond[i]=true;
+          willExport[i]=true;
+          hasK051649|=0x40000000;
+          if (song.system[i]==DIV_SYSTEM_SCC_PLUS) {
+            hasK051649|=0x80000000;
+          }
           howManyChips++;
         }
         break;
@@ -1210,14 +1348,15 @@ SafeWriter* DivEngine::saveVGM(bool* sysToExport, bool loop, int version) {
     size_t memPos=0;
     for (int i=0; i<song.sampleLen; i++) {
       DivSample* sample=song.sample[i];
-      if ((memPos&0xff0000)!=((memPos+sample->length8)&0xff0000)) {
+      unsigned int alignedSize=(sample->length8+0xff)&(~0xff);
+      if (alignedSize>65536) alignedSize=65536;
+      if ((memPos&0xff0000)!=((memPos+alignedSize)&0xff0000)) {
         memPos=(memPos+0xffff)&0xff0000;
       }
+      logV("- sample %d will be at %x with length %x",i,memPos,alignedSize);
       if (memPos>=16777216) break;
       sample->offSegaPCM=memPos;
-      unsigned int alignedSize=(sample->length8+0xff)&(~0xff);
       unsigned int readPos=0;
-      if (alignedSize>65536) alignedSize=65536;
       for (unsigned int j=0; j<alignedSize; j++) {
         if (readPos>=sample->length8) {
           if (sample->loopStart>=0 && sample->loopStart<(int)sample->length8) {

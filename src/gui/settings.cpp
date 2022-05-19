@@ -419,11 +419,6 @@ void FurnaceGUI::drawSettings() {
             settings.restartOnFlagChange=restartOnFlagChangeB;
           }
 
-          bool insLoadAlwaysReplaceB=settings.insLoadAlwaysReplace;
-          if (ImGui::Checkbox("Always replace currently selected instrument when loading from instrument list",&insLoadAlwaysReplaceB)) {
-            settings.insLoadAlwaysReplace=insLoadAlwaysReplaceB;
-          }
-
           bool sysFileDialogB=settings.sysFileDialog;
           if (ImGui::Checkbox("Use system file picker",&sysFileDialogB)) {
             settings.sysFileDialog=sysFileDialogB;
@@ -888,6 +883,33 @@ void FurnaceGUI::drawSettings() {
           ImGui::Text("FDS core");
           ImGui::SameLine();
           ImGui::Combo("##FDSCore",&settings.fdsCore,nesCores,2);
+
+          ImGui::Separator();
+          ImGui::Text("Sample ROMs:");
+
+          ImGui::Text("OPL4 YRW801 path");
+          ImGui::SameLine();
+          ImGui::InputText("##YRW801Path",&settings.yrw801Path);
+          ImGui::SameLine();
+          if (ImGui::Button(ICON_FA_FOLDER "##YRW801Load")) {
+            openFileDialog(GUI_FILE_YRW801_ROM_OPEN);
+          }
+
+          ImGui::Text("MultiPCM TG100 path");
+          ImGui::SameLine();
+          ImGui::InputText("##TG100Path",&settings.tg100Path);
+          ImGui::SameLine();
+          if (ImGui::Button(ICON_FA_FOLDER "##TG100Load")) {
+            openFileDialog(GUI_FILE_TG100_ROM_OPEN);
+          }
+
+          ImGui::Text("MultiPCM MU5 path");
+          ImGui::SameLine();
+          ImGui::InputText("##MU5Path",&settings.mu5Path);
+          ImGui::SameLine();
+          if (ImGui::Button(ICON_FA_FOLDER "##MU5Load")) {
+            openFileDialog(GUI_FILE_MU5_ROM_OPEN);
+          }
         }
         ImGui::EndChild();
         ImGui::EndTabItem();
@@ -953,6 +975,19 @@ void FurnaceGUI::drawSettings() {
               "This is a temporary solution until dynamic font atlas is implemented in Dear ImGui.\n\n"
               "このオプションは、十分なグラフィックメモリがある場合にのみ切り替えてください。\n"
               "これは、Dear ImGuiにダイナミックフォントアトラスが実装されるまでの一時的な解決策です。"
+            );
+          }
+
+          bool loadChineseB=settings.loadChinese;
+          if (ImGui::Checkbox("Display Chinese (Simplified) characters",&loadChineseB)) {
+            settings.loadChinese=loadChineseB;
+          }
+          if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+              "Only toggle this option if you have enough graphics memory.\n"
+              "This is a temporary solution until dynamic font atlas is implemented in Dear ImGui.\n\n"
+              "请在确保你有足够的显存后再启动此设定\n"
+              "这是一个在ImGui实现动态字体加载之前的临时解决方案"
             );
           }
 
@@ -1104,13 +1139,6 @@ void FurnaceGUI::drawSettings() {
             settings.oplStandardWaveNames=oplStandardWaveNamesB;
           }
 
-          if (nonLatchNibble) {
-            bool hiddenSystemsB=settings.hiddenSystems;
-            if (ImGui::Checkbox(":smile: :star_struck: :sunglasses: :ok_hand:",&hiddenSystemsB)) {
-              settings.hiddenSystems=hiddenSystemsB;
-            }
-          }
-
           bool overflowHighlightB=settings.overflowHighlight;
           if (ImGui::Checkbox("Overflow pattern highlights",&overflowHighlightB)) {
             settings.overflowHighlight=overflowHighlightB;
@@ -1150,6 +1178,11 @@ void FurnaceGUI::drawSettings() {
           bool sampleLayoutB=settings.sampleLayout;
           if (ImGui::Checkbox("Use compact sample editor",&sampleLayoutB)) {
             settings.sampleLayout=sampleLayoutB;
+          }
+
+          bool oldMacroVSliderB=settings.oldMacroVSlider;
+          if (ImGui::Checkbox("Use classic macro editor vertical slider",&oldMacroVSliderB)) {
+            settings.oldMacroVSlider=oldMacroVSliderB;
           }
 
           bool roundedWindowsB=settings.roundedWindows;
@@ -1387,6 +1420,16 @@ void FurnaceGUI::drawSettings() {
               UI_COLOR_CONFIG(GUI_COLOR_EE_VALUE,"External command output");
               ImGui::TreePop();
             }
+            if (ImGui::TreeNode("Piano")) {
+              UI_COLOR_CONFIG(GUI_COLOR_PIANO_BACKGROUND,"Background");
+              UI_COLOR_CONFIG(GUI_COLOR_PIANO_KEY_TOP,"Upper key");
+              UI_COLOR_CONFIG(GUI_COLOR_PIANO_KEY_TOP_HIT,"Upper key (feedback)");
+              UI_COLOR_CONFIG(GUI_COLOR_PIANO_KEY_TOP_ACTIVE,"Upper key (pressed)");
+              UI_COLOR_CONFIG(GUI_COLOR_PIANO_KEY_BOTTOM,"Lower key");
+              UI_COLOR_CONFIG(GUI_COLOR_PIANO_KEY_BOTTOM_HIT,"Lower key (feedback)");
+              UI_COLOR_CONFIG(GUI_COLOR_PIANO_KEY_BOTTOM_ACTIVE,"Lower key (pressed)");
+              ImGui::TreePop();
+            }
             if (ImGui::TreeNode("Log Viewer")) {
               UI_COLOR_CONFIG(GUI_COLOR_LOGLEVEL_ERROR,"Log level: Error");
               UI_COLOR_CONFIG(GUI_COLOR_LOGLEVEL_WARNING,"Log level: Warning");
@@ -1456,6 +1499,7 @@ void FurnaceGUI::drawSettings() {
             UI_KEYBIND_CONFIG(GUI_ACTION_WINDOW_INS_LIST);
             UI_KEYBIND_CONFIG(GUI_ACTION_WINDOW_INS_EDIT);
             UI_KEYBIND_CONFIG(GUI_ACTION_WINDOW_SONG_INFO);
+            UI_KEYBIND_CONFIG(GUI_ACTION_WINDOW_SUBSONGS);
             UI_KEYBIND_CONFIG(GUI_ACTION_WINDOW_PATTERN);
             UI_KEYBIND_CONFIG(GUI_ACTION_WINDOW_WAVE_LIST);
             UI_KEYBIND_CONFIG(GUI_ACTION_WINDOW_WAVE_EDIT);
@@ -1749,6 +1793,47 @@ void FurnaceGUI::drawSettings() {
         ImGui::EndChild();
         ImGui::EndTabItem();
       }
+      if (nonLatchNibble) {
+        // ok, so you decided to read the code.
+        // these are the cheat codes:
+        // "Debug" - toggles mobile UI
+        // "Nice Amiga cover of the song!" - enables hidden systems (YMU759/SoundUnit/Dummy)
+        if (ImGui::BeginTabItem("Cheat Codes")) {
+          ImVec2 settingsViewSize=ImGui::GetContentRegionAvail();
+          settingsViewSize.y-=ImGui::GetFrameHeight()+ImGui::GetStyle().WindowPadding.y;
+          if (ImGui::BeginChild("SettingsView",settingsViewSize)) {
+            ImGui::Text("Enter code:");
+            ImGui::InputText("##CheatCode",&mmlString[31]);
+            if (ImGui::Button("Submit")) {
+              unsigned int checker=0x11111111;
+              unsigned int checker1=0;
+              int index=0;
+              mmlString[30]="invalid code";
+
+              for (char& i: mmlString[31]) {
+                checker^=((unsigned int)i)<<index;
+                checker1+=i;
+                checker=(checker>>1|(((checker)^(checker>>2)^(checker>>3)^(checker>>5))&1)<<31);
+                checker1<<=1;
+                index=(index+1)&31;
+              }
+              if (checker==0x90888b65 && checker1==0x1482) {
+                mmlString[30]="toggled alternate UI";
+                toggleMobileUI(!mobileUI);
+              }
+              if (checker==0x5a42a113 && checker1==0xe4ef451e) {
+                mmlString[30]=":smile: :star_struck: :sunglasses: :ok_hand:";
+                settings.hiddenSystems=!settings.hiddenSystems;
+              }
+
+              mmlString[31]="";
+            }
+            ImGui::Text("%s",mmlString[30].c_str());
+          }
+          ImGui::EndChild();
+          ImGui::EndTabItem();
+        }
+      }
       ImGui::EndTabBar();
     }
     ImGui::Separator();
@@ -1790,6 +1875,9 @@ void FurnaceGUI::syncSettings() {
   settings.saaCore=e->getConfInt("saaCore",1);
   settings.nesCore=e->getConfInt("nesCore",0);
   settings.fdsCore=e->getConfInt("fdsCore",0);
+  settings.yrw801Path=e->getConfString("yrw801Path","");
+  settings.tg100Path=e->getConfString("tg100Path","");
+  settings.mu5Path=e->getConfString("mu5Path","");
   settings.mainFont=e->getConfInt("mainFont",0);
   settings.patFont=e->getConfInt("patFont",0);
   settings.mainFontPath=e->getConfString("mainFontPath","");
@@ -1826,6 +1914,7 @@ void FurnaceGUI::syncSettings() {
   settings.roundedButtons=e->getConfInt("roundedButtons",1);
   settings.roundedMenus=e->getConfInt("roundedMenus",0);
   settings.loadJapanese=e->getConfInt("loadJapanese",0);
+  settings.loadChinese=e->getConfInt("loadChinese",0);
   settings.fmLayout=e->getConfInt("fmLayout",0);
   settings.sampleLayout=e->getConfInt("sampleLayout",0);
   settings.waveLayout=e->getConfInt("waveLayout",0);
@@ -1851,11 +1940,11 @@ void FurnaceGUI::syncSettings() {
   settings.powerSave=e->getConfInt("powerSave",POWER_SAVE_DEFAULT);
   settings.absorbInsInput=e->getConfInt("absorbInsInput",0);
   settings.eventDelay=e->getConfInt("eventDelay",0);
-  settings.moveWindowTitle=e->getConfInt("moveWindowTitle",0);
+  settings.moveWindowTitle=e->getConfInt("moveWindowTitle",1);
   settings.hiddenSystems=e->getConfInt("hiddenSystems",0);
-  settings.insLoadAlwaysReplace=e->getConfInt("insLoadAlwaysReplace",1);
   settings.horizontalDataView=e->getConfInt("horizontalDataView",0);
   settings.noMultiSystem=e->getConfInt("noMultiSystem",0);
+  settings.oldMacroVSlider=e->getConfInt("oldMacroVSlider",0);
 
   clampSetting(settings.mainFontSize,2,96);
   clampSetting(settings.patFontSize,2,96);
@@ -1902,6 +1991,7 @@ void FurnaceGUI::syncSettings() {
   clampSetting(settings.roundedButtons,0,1);
   clampSetting(settings.roundedMenus,0,1);
   clampSetting(settings.loadJapanese,0,1);
+  clampSetting(settings.loadChinese,0,1);
   clampSetting(settings.fmLayout,0,3);
   clampSetting(settings.susPosition,0,1);
   clampSetting(settings.effectCursorDir,0,2);
@@ -1926,9 +2016,9 @@ void FurnaceGUI::syncSettings() {
   clampSetting(settings.eventDelay,0,1);
   clampSetting(settings.moveWindowTitle,0,1);
   clampSetting(settings.hiddenSystems,0,1);
-  clampSetting(settings.insLoadAlwaysReplace,0,1);
   clampSetting(settings.horizontalDataView,0,1);
-  clampSetting(settings.noMultiSystem,0,1)
+  clampSetting(settings.noMultiSystem,0,1);
+  clampSetting(settings.oldMacroVSlider,0,1);
 
   settings.initialSys=e->decodeSysDesc(e->getConfString("initialSys",""));
   if (settings.initialSys.size()<4) {
@@ -1961,6 +2051,10 @@ void FurnaceGUI::syncSettings() {
 }
 
 void FurnaceGUI::commitSettings() {
+  bool sampleROMsChanged = settings.yrw801Path!=e->getConfString("yrw801Path","") ||
+    settings.tg100Path!=e->getConfString("tg100Path","") ||
+    settings.mu5Path!=e->getConfString("mu5Path","");
+
   e->setConf("mainFontSize",settings.mainFontSize);
   e->setConf("patFontSize",settings.patFontSize);
   e->setConf("iconSize",settings.iconSize);
@@ -1976,6 +2070,9 @@ void FurnaceGUI::commitSettings() {
   e->setConf("saaCore",settings.saaCore);
   e->setConf("nesCore",settings.nesCore);
   e->setConf("fdsCore",settings.fdsCore);
+  e->setConf("yrw801Path",settings.yrw801Path);
+  e->setConf("tg100Path",settings.tg100Path);
+  e->setConf("mu5Path",settings.mu5Path);
   e->setConf("mainFont",settings.mainFont);
   e->setConf("patFont",settings.patFont);
   e->setConf("mainFontPath",settings.mainFontPath);
@@ -2012,6 +2109,7 @@ void FurnaceGUI::commitSettings() {
   e->setConf("roundedButtons",settings.roundedButtons);
   e->setConf("roundedMenus",settings.roundedMenus);
   e->setConf("loadJapanese",settings.loadJapanese);
+  e->setConf("loadChinese",settings.loadChinese);
   e->setConf("fmLayout",settings.fmLayout);
   e->setConf("sampleLayout",settings.sampleLayout);
   e->setConf("waveLayout",settings.waveLayout);
@@ -2040,9 +2138,9 @@ void FurnaceGUI::commitSettings() {
   e->setConf("moveWindowTitle",settings.moveWindowTitle);
   e->setConf("hiddenSystems",settings.hiddenSystems);
   e->setConf("initialSys",e->encodeSysDesc(settings.initialSys));
-  e->setConf("insLoadAlwaysReplace",settings.insLoadAlwaysReplace);
   e->setConf("horizontalDataView",settings.horizontalDataView);
   e->setConf("noMultiSystem",settings.noMultiSystem);
+  e->setConf("oldMacroVSlider",settings.oldMacroVSlider);
 
   // colors
   for (int i=0; i<GUI_COLOR_MAX; i++) {
@@ -2063,6 +2161,12 @@ void FurnaceGUI::commitSettings() {
   midiMap.write(e->getConfigPath()+DIR_SEPARATOR_STR+"midiIn_"+stripName(settings.midiInDevice)+".cfg");
 
   e->saveConf();
+
+  if (sampleROMsChanged) {
+    if (e->loadSampleROMs()) {
+      showError(e->getLastError());
+    }
+  }
 
   if (!e->switchMaster()) {
     showError("could not initialize audio!");
@@ -2223,6 +2327,10 @@ bool FurnaceGUI::exportKeybinds(String path) {
 }
 
 bool FurnaceGUI::importLayout(String path) {
+  if (mobileUI) {
+    logW("but you are on the mobile UI!");
+    return false;
+  }
   FILE* f=ps_fopen(path.c_str(),"rb");
   if (f==NULL) {
     logW("error while opening keybind file for import: %s",strerror(errno));
@@ -2269,6 +2377,10 @@ bool FurnaceGUI::importLayout(String path) {
 }
 
 bool FurnaceGUI::exportLayout(String path) {
+  if (mobileUI) {
+    logW("but you are on the mobile UI!");
+    return false;
+  }
   FILE* f=ps_fopen(path.c_str(),"wb");
   if (f==NULL) {
     logW("error while opening layout file for export: %s",strerror(errno));
@@ -2595,6 +2707,9 @@ void FurnaceGUI::applyUISettings(bool updateFonts) {
     range.AddRanges(upTo800);
     if (settings.loadJapanese) {
       range.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesJapanese());
+    }
+    if (settings.loadChinese) {
+      range.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesChineseSimplifiedCommon());
     }
     // I'm terribly sorry
     range.UsedChars[0x80>>5]=0;
