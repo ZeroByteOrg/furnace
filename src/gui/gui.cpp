@@ -2826,6 +2826,26 @@ bool FurnaceGUI::loop() {
           }
           ImGui::EndMenu();
         }
+        int numZSMCompat=0;
+        for (int i=0; i<e->song.systemLen; i++) {
+          if ((e->song.system[i] == DIV_SYSTEM_VERA) || (e->song.system[i] == DIV_SYSTEM_YM2151)) numZSMCompat++;
+        }
+        if (numZSMCompat > 0) {
+          if (ImGui::BeginMenu("export ZSM...")) {
+              ImGui::Text("Commander X16 Zsound Music File");
+              if (ImGui::InputInt("Tick Rate (Hz)",&zsmExportTickRate,1,2)) {
+                if (zsmExportTickRate<1) zsmExportTickRate=1;
+                if (zsmExportTickRate>44100) zsmExportTickRate=44100;
+              }
+              ImGui::Checkbox("loop",&zsmExportLoop);
+              ImGui::SameLine();
+              if (ImGui::Button("  Go  ")) {
+                  openFileDialog(GUI_FILE_EXPORT_ZSM);
+                  ImGui::CloseCurrentPopup();
+              }
+              ImGui::EndMenu();
+          }
+        }
         ImGui::Separator();
         if (ImGui::BeginMenu("add system...")) {
           for (int j=0; availableSystems[j]; j++) {
@@ -2834,41 +2854,12 @@ bool FurnaceGUI::loop() {
           }
           ImGui::EndMenu();
         }
-        ImGui::EndMenu();
-      }
-      int numZSMCompat=0;
-      for (int i=0; i<e->song.systemLen; i++) {
-        if ((e->song.system[i] == DIV_SYSTEM_VERA) || (e->song.system[i] == DIV_SYSTEM_YM2151)) numZSMCompat++;
-	    }
-      if (numZSMCompat > 0) {
-        if (ImGui::BeginMenu("export ZSM...")) {
-		        ImGui::Text("Commander X16 Zsound Music File");
-            if (ImGui::InputInt("Tick Rate (Hz)",&zsmExportTickRate,1,2)) {
-              if (zsmExportTickRate<1) zsmExportTickRate=1;
-              if (zsmExportTickRate>44100) zsmExportTickRate=44100;
+        if (ImGui::BeginMenu("configure system...")) {
+          for (int i=0; i<e->song.systemLen; i++) {
+            if (ImGui::TreeNode(fmt::sprintf("%d. %s##_SYSP%d",i+1,getSystemName(e->song.system[i]),i).c_str())) {
+              drawSysConf(i,e->song.system[i],e->song.systemFlags[i],true);
+              ImGui::TreePop();
             }
-            ImGui::Checkbox("loop",&zsmExportLoop);
-            ImGui::SameLine();
-            if (ImGui::Button("  Go  ")) {
-		            openFileDialog(GUI_FILE_EXPORT_ZSM);
-		            ImGui::CloseCurrentPopup();
-            }
-		        ImGui::EndMenu();
-        }
-      }
-      ImGui::Separator();
-      if (ImGui::BeginMenu("add system...")) {
-        for (int j=0; availableSystems[j]; j++) {
-          if (!settings.hiddenSystems && (availableSystems[j]==DIV_SYSTEM_YMU759 || availableSystems[j]==DIV_SYSTEM_DUMMY || availableSystems[j]==DIV_SYSTEM_SOUND_UNIT)) continue;
-          sysAddOption((DivSystem)availableSystems[j]);
-        }
-        ImGui::EndMenu();
-      }
-      if (ImGui::BeginMenu("configure system...")) {
-        for (int i=0; i<e->song.systemLen; i++) {
-          if (ImGui::TreeNode(fmt::sprintf("%d. %s##_SYSP%d",i+1,getSystemName(e->song.system[i]),i).c_str())) {
-            drawSysConf(i,e->song.system[i],e->song.systemFlags[i],true);
-            ImGui::TreePop();
           }
           ImGui::EndMenu();
         }
@@ -3190,8 +3181,8 @@ bool FurnaceGUI::loop() {
           workingDirVGMExport=fileDialog->getPath()+DIR_SEPARATOR_STR;
           break;
         case GUI_FILE_EXPORT_ZSM:
-		  workingDirZSMExport=fileDialog->getPath()+DIR_SEPARATOR_STR;
-		  break;
+          workingDirZSMExport=fileDialog->getPath()+DIR_SEPARATOR_STR;
+          break;
         case GUI_FILE_LOAD_MAIN_FONT:
         case GUI_FILE_LOAD_PAT_FONT:
           workingDirFont=fileDialog->getPath()+DIR_SEPARATOR_STR;
@@ -3406,8 +3397,8 @@ bool FurnaceGUI::loop() {
               break;
             }
             case GUI_FILE_EXPORT_ZSM: {
-			  SafeWriter* w=e->saveZSM(zsmExportTickRate,zsmExportLoop);
-			  if (w!=NULL) {
+              SafeWriter* w=e->saveZSM(zsmExportTickRate,zsmExportLoop);
+              if (w!=NULL) {
                 FILE* f=ps_fopen(copyOfName.c_str(),"wb");
                 if (f!=NULL) {
                   fwrite(w->getFinalBuf(),1,w->size(),f);
@@ -3420,11 +3411,11 @@ bool FurnaceGUI::loop() {
                 if (!e->getWarnings().empty()) {
                   showWarning(e->getWarnings(),GUI_WARN_GENERIC);
                 }
-			  } else {
+              } else {
                 showError(fmt::sprintf("Could not write ZSM! (%s)",e->getLastError()));
-			  }
+              }
               break;
-		    }
+            }
             case GUI_FILE_EXPORT_ROM:
               showError("Coming soon!");
               break;
