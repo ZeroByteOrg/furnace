@@ -21,6 +21,7 @@
 #define _FUR_GUI_H
 
 #include "../engine/engine.h"
+#include "../engine/waveSynth.h"
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_sdlrenderer.h"
@@ -150,6 +151,7 @@ enum FurnaceGUIColors {
   GUI_COLOR_INSTR_MULTIPCM,
   GUI_COLOR_INSTR_SNES,
   GUI_COLOR_INSTR_SU,
+  GUI_COLOR_INSTR_NAMCO,
   GUI_COLOR_INSTR_UNKNOWN,
 
   GUI_COLOR_CHANNEL_FM,
@@ -811,13 +813,15 @@ class FurnaceGUI {
   String mmlString[17];
   String mmlStringW;
 
-  bool quit, warnQuit, willCommit, edit, modified, displayError, displayExporting, vgmExportLoop, zsmExportLoop, wantCaptureKeyboard, oldWantCaptureKeyboard, displayMacroMenu;
-  bool displayNew, fullScreen, preserveChanPos;
+  bool quit, warnQuit, willCommit, edit, modified, displayError, displayExporting, vgmExportLoop, zsnExportLoop, wantCaptureKeyboard, oldWantCaptureKeyboard, displayMacroMenu;
+  bool displayNew, fullScreen, preserveChanPos, wantScrollList;
   bool willExport[32];
   int vgmExportVersion;
   int drawHalt;
   int zsmExportTickRate;
   int macroPointSize;
+
+  ImGuiWindowFlags globalWinFlags;
 
   FurnaceGUIFileDialogs curFileDialog;
   FurnaceGUIWarnings warnAction;
@@ -938,6 +942,7 @@ class FurnaceGUI {
     int horizontalDataView;
     int noMultiSystem;
     int oldMacroVSlider;
+    int displayAllInsTypes;
     unsigned int maxUndoSteps;
     String mainFontPath;
     String patFontPath;
@@ -1027,6 +1032,7 @@ class FurnaceGUI {
       horizontalDataView(0),
       noMultiSystem(0),
       oldMacroVSlider(0),
+      displayAllInsTypes(0),
       maxUndoSteps(100),
       mainFontPath(""),
       patFontPath(""),
@@ -1070,6 +1076,10 @@ class FurnaceGUI {
   OperationMask opMaskInterpolate, opMaskFade, opMaskInvertVal, opMaskScale;
   OperationMask opMaskRandomize, opMaskFlip, opMaskCollapseExpand;
   short latchNote, latchIns, latchVol, latchEffect, latchEffectVal;
+
+  DivWaveSynth wavePreview;
+  int wavePreviewLen, wavePreviewHeight;
+  bool wavePreviewInit;
 
   // bit 31: ctrl
   // bit 30: reserved for SDL scancode mask
@@ -1269,6 +1279,7 @@ class FurnaceGUI {
 
   void toggleMobileUI(bool enable, bool force=false);
 
+  void drawMobileControls();
   void drawEditControls();
   void drawSongInfo();
   void drawOrders();

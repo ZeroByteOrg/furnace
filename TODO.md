@@ -1,12 +1,15 @@
 # to-do for 0.6pre1
 
-- finish ExtCh on OPNA
-- RF5C68 system
-- ZX beeper system overlay percussion
+- additional YM2612 features
+  - CSM
+  - DualPCM
+  - reverse sample playback
 - ADPCM chips
 - Game Boy envelope macro/sequence
+- drag-and-drop ins/wave/sample loading
+- "set loop" in right click menu of sample editor
+- sample editor preview in selection
 - rewrite the system name detection function anyway
-- scroll instrument/wave/sample list when selecting item
 - unified data view
 - volume commands should work on Game Boy
 - add another FM editor layout

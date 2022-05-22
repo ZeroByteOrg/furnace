@@ -79,6 +79,7 @@ bool Particle::update(float frameTime) {
 
 void FurnaceGUI::bindEngine(DivEngine* eng) {
   e=eng;
+  wavePreview.setEngine(e);
 }
 
 const char* FurnaceGUI::noteName(short note, short octave) {
@@ -924,6 +925,7 @@ void FurnaceGUI::valueInput(int num, bool direct, int target) {
     }
     if (settings.absorbInsInput) {
       curIns=pat->data[cursor.y][target];
+      wavePreviewInit=true;
     }
     makeUndo(GUI_UNDO_PATTERN_EDIT);
     if (direct) {
@@ -2660,6 +2662,7 @@ bool FurnaceGUI::loop() {
             if (midiMap.programChange) {
               curIns=msg.data[0];
               if (curIns>=(int)e->song.ins.size()) curIns=e->song.ins.size()-1;
+              wavePreviewInit=true;
             }
             break;
           case TA_MIDI_CONTROL:
@@ -3043,10 +3046,6 @@ bool FurnaceGUI::loop() {
       ImGui::EndMainMenuBar();
     }
 
-    if (!mobileUI) {
-      ImGui::DockSpaceOverViewport(NULL,lockLayout?(ImGuiDockNodeFlags_NoResize|ImGuiDockNodeFlags_NoCloseButton|ImGuiDockNodeFlags_NoDocking|ImGuiDockNodeFlags_NoDockingSplitMe|ImGuiDockNodeFlags_NoDockingSplitOther):0);
-    }
-
     if (mobileUI) {
       ImGuiViewport* mainView=ImGui::GetMainViewport();
       ImGui::SetNextWindowPos(mainView->Pos);
@@ -3084,6 +3083,9 @@ bool FurnaceGUI::loop() {
       drawPattern();
       drawPiano();
     } else {
+      globalWinFlags=0;
+      ImGui::DockSpaceOverViewport(NULL,lockLayout?(ImGuiDockNodeFlags_NoResize|ImGuiDockNodeFlags_NoCloseButton|ImGuiDockNodeFlags_NoDocking|ImGuiDockNodeFlags_NoDockingSplitMe|ImGuiDockNodeFlags_NoDockingSplitOther):0);
+
       drawSubSongs();
       drawPattern();
       drawEditControls();
@@ -3149,6 +3151,7 @@ bool FurnaceGUI::loop() {
           }
         } else {
           curIns=prevIns;
+          wavePreviewInit=true;
         }
         prevIns=-3;
       }
@@ -3870,6 +3873,7 @@ bool FurnaceGUI::loop() {
 
     wheelX=0;
     wheelY=0;
+    wantScrollList=false;
 
     pressedPoints.clear();
     releasedPoints.clear();
@@ -4183,10 +4187,12 @@ FurnaceGUI::FurnaceGUI():
   displayNew(false),
   fullScreen(false),
   preserveChanPos(false),
+  wantScrollList(false),
   vgmExportVersion(0x171),
   drawHalt(10),
   zsmExportTickRate(60),
   macroPointSize(16),
+  globalWinFlags(0),
   curFileDialog(GUI_FILE_OPEN),
   warnAction(GUI_WARN_OPEN),
   postWarnAction(GUI_WARN_GENERIC),
@@ -4314,6 +4320,9 @@ FurnaceGUI::FurnaceGUI():
   latchVol(-1),
   latchEffect(-1),
   latchEffectVal(-1),
+  wavePreviewLen(32),
+  wavePreviewHeight(255),
+  wavePreviewInit(true),
   wavePreviewOn(false),
   wavePreviewKey((SDL_Scancode)0),
   wavePreviewNote(0),

@@ -17,28 +17,24 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef _SU_H
-#define _SU_H
+#ifndef _NAMCOWSG_H
+#define _NAMCOWSG_H
 
 #include "../dispatch.h"
 #include <queue>
 #include "../macroInt.h"
-#include "sound/su.h"
+#include "../waveSynth.h"
+#include "sound/namco.h"
 
-class DivPlatformSoundUnit: public DivDispatch {
+class DivPlatformNamcoWSG: public DivDispatch {
   struct Channel {
     int freq, baseFreq, pitch, pitch2, note;
-    int ins, cutoff, baseCutoff, res, control, hasOffset;
-    signed char pan;
-    unsigned char duty;
-    bool active, insChanged, freqChanged, keyOn, keyOff, inPorta, noise, pcm, phaseReset, filterPhaseReset;
-    bool pcmLoop, timerSync, freqSweep, volSweep, cutSweep;
-    unsigned short freqSweepP, volSweepP, cutSweepP;
-    unsigned char freqSweepB, volSweepB, cutSweepB;
-    unsigned char freqSweepV, volSweepV, cutSweepV;
-    unsigned short syncTimer;
+    int ins;
+    unsigned char pan;
+    bool active, insChanged, freqChanged, keyOn, keyOff, inPorta, noise;
     signed char vol, outVol, wave;
     DivMacroInt std;
+    DivWaveSynth ws;
     void macroInit(DivInstrument* which) {
       std.init(which);
       pitch2=0;
@@ -50,13 +46,7 @@ class DivPlatformSoundUnit: public DivDispatch {
       pitch2(0),
       note(0),
       ins(-1),
-      cutoff(16383),
-      baseCutoff(16380),
-      res(0),
-      control(0),
-      hasOffset(0),
-      pan(0),
-      duty(63),
+      pan(255),
       active(false),
       insChanged(true),
       freqChanged(false),
@@ -64,49 +54,26 @@ class DivPlatformSoundUnit: public DivDispatch {
       keyOff(false),
       inPorta(false),
       noise(false),
-      pcm(false),
-      phaseReset(false),
-      filterPhaseReset(false),
-      pcmLoop(false),
-      timerSync(false),
-      freqSweep(false),
-      volSweep(false),
-      cutSweep(false),
-      freqSweepP(0),
-      volSweepP(0),
-      cutSweepP(0),
-      freqSweepB(0),
-      volSweepB(0),
-      cutSweepB(0),
-      freqSweepV(0),
-      volSweepV(0),
-      cutSweepV(0),
-      syncTimer(0),
-      vol(127),
-      outVol(127),
-      wave(0) {}
+      vol(15),
+      outVol(15),
+      wave(-1) {}
   };
   Channel chan[8];
   DivDispatchOscBuffer* oscBuf[8];
   bool isMuted[8];
   struct QueuedWrite {
-      unsigned char addr;
+      unsigned short addr;
       unsigned char val;
-      QueuedWrite(unsigned char a, unsigned char v): addr(a), val(v) {}
+      QueuedWrite(unsigned short a, unsigned char v): addr(a), val(v) {}
   };
   std::queue<QueuedWrite> writes;
   unsigned char lastPan;
 
   int cycles, curChan, delay;
-  short tempL;
-  short tempR;
-  unsigned char sampleBank, lfoMode, lfoSpeed;
-  SoundUnit* su;
-  size_t sampleMemLen;
-  unsigned char regPool[128];
-  void writeControl(int ch);
-  void writeControlUpper(int ch);
-
+  namco_audio_device* namco;
+  int devType, chans;
+  unsigned char regPool[512];
+  void updateWave(int ch);
   friend void putDispatchChan(void*,int,int);
   public:
     void acquire(short* bufL, short* bufR, size_t start, size_t len);
@@ -121,19 +88,17 @@ class DivPlatformSoundUnit: public DivDispatch {
     void muteChannel(int ch, bool mute);
     bool isStereo();
     bool keyOffAffectsArp(int ch);
+    void setDeviceType(int type);
     void setFlags(unsigned int flags);
+    void notifyWaveChange(int wave);
     void notifyInsDeletion(void* ins);
     void poke(unsigned int addr, unsigned short val);
     void poke(std::vector<DivRegWrite>& wlist);
     const char** getRegisterSheet();
     const char* getEffectName(unsigned char effect);
-    const void* getSampleMem(int index);
-    size_t getSampleMemCapacity(int index);
-    size_t getSampleMemUsage(int index);
-    void renderSamples();
     int init(DivEngine* parent, int channels, int sugRate, unsigned int flags);
     void quit();
-    ~DivPlatformSoundUnit();
+    ~DivPlatformNamcoWSG();
 };
 
 #endif

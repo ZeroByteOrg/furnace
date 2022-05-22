@@ -17,27 +17,23 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef _SU_H
-#define _SU_H
+#ifndef _RF5C68_H
+#define _RF5C68_H
 
 #include "../dispatch.h"
 #include <queue>
 #include "../macroInt.h"
-#include "sound/su.h"
+#include "sound/rf5c68.h"
 
-class DivPlatformSoundUnit: public DivDispatch {
+class DivPlatformRF5C68: public DivDispatch {
   struct Channel {
-    int freq, baseFreq, pitch, pitch2, note;
-    int ins, cutoff, baseCutoff, res, control, hasOffset;
-    signed char pan;
-    unsigned char duty;
-    bool active, insChanged, freqChanged, keyOn, keyOff, inPorta, noise, pcm, phaseReset, filterPhaseReset;
-    bool pcmLoop, timerSync, freqSweep, volSweep, cutSweep;
-    unsigned short freqSweepP, volSweepP, cutSweepP;
-    unsigned char freqSweepB, volSweepB, cutSweepB;
-    unsigned char freqSweepV, volSweepV, cutSweepV;
-    unsigned short syncTimer;
-    signed char vol, outVol, wave;
+    int freq, baseFreq, pitch, pitch2;
+    unsigned int audPos;
+    int sample, wave, ins;
+    int note;
+    int panning;
+    bool active, insChanged, freqChanged, keyOn, keyOff, inPorta, setPos;
+    int vol, outVol;
     DivMacroInt std;
     void macroInit(DivInstrument* which) {
       std.init(which);
@@ -48,66 +44,33 @@ class DivPlatformSoundUnit: public DivDispatch {
       baseFreq(0),
       pitch(0),
       pitch2(0),
-      note(0),
+      audPos(0),
+      sample(-1),
       ins(-1),
-      cutoff(16383),
-      baseCutoff(16380),
-      res(0),
-      control(0),
-      hasOffset(0),
-      pan(0),
-      duty(63),
+      note(0),
+      panning(255),
       active(false),
       insChanged(true),
       freqChanged(false),
       keyOn(false),
       keyOff(false),
       inPorta(false),
-      noise(false),
-      pcm(false),
-      phaseReset(false),
-      filterPhaseReset(false),
-      pcmLoop(false),
-      timerSync(false),
-      freqSweep(false),
-      volSweep(false),
-      cutSweep(false),
-      freqSweepP(0),
-      volSweepP(0),
-      cutSweepP(0),
-      freqSweepB(0),
-      volSweepB(0),
-      cutSweepB(0),
-      freqSweepV(0),
-      volSweepV(0),
-      cutSweepV(0),
-      syncTimer(0),
-      vol(127),
-      outVol(127),
-      wave(0) {}
+      setPos(false),
+      vol(255),
+      outVol(255) {}
   };
   Channel chan[8];
   DivDispatchOscBuffer* oscBuf[8];
   bool isMuted[8];
-  struct QueuedWrite {
-      unsigned char addr;
-      unsigned char val;
-      QueuedWrite(unsigned char a, unsigned char v): addr(a), val(v) {}
-  };
-  std::queue<QueuedWrite> writes;
-  unsigned char lastPan;
+  int chipType;
+  unsigned char curChan;
 
-  int cycles, curChan, delay;
-  short tempL;
-  short tempR;
-  unsigned char sampleBank, lfoMode, lfoSpeed;
-  SoundUnit* su;
+  unsigned char* sampleMem;
   size_t sampleMemLen;
-  unsigned char regPool[128];
-  void writeControl(int ch);
-  void writeControlUpper(int ch);
-
+  rf5c68_device rf5c68;
+  unsigned char regPool[144];
   friend void putDispatchChan(void*,int,int);
+
   public:
     void acquire(short* bufL, short* bufR, size_t start, size_t len);
     int dispatch(DivCommand c);
@@ -120,20 +83,23 @@ class DivPlatformSoundUnit: public DivDispatch {
     void tick(bool sysTick=true);
     void muteChannel(int ch, bool mute);
     bool isStereo();
-    bool keyOffAffectsArp(int ch);
-    void setFlags(unsigned int flags);
+    void setChipModel(int type);
+    void notifyInsChange(int ins);
+    void notifyWaveChange(int wave);
     void notifyInsDeletion(void* ins);
+    void setFlags(unsigned int flags);
     void poke(unsigned int addr, unsigned short val);
     void poke(std::vector<DivRegWrite>& wlist);
     const char** getRegisterSheet();
     const char* getEffectName(unsigned char effect);
-    const void* getSampleMem(int index);
-    size_t getSampleMemCapacity(int index);
-    size_t getSampleMemUsage(int index);
+    const void* getSampleMem(int index = 0);
+    size_t getSampleMemCapacity(int index = 0);
+    size_t getSampleMemUsage(int index = 0);
     void renderSamples();
     int init(DivEngine* parent, int channels, int sugRate, unsigned int flags);
     void quit();
-    ~DivPlatformSoundUnit();
+  private:
+    void chWrite(unsigned char ch, unsigned int addr, unsigned char val);
 };
 
 #endif

@@ -256,6 +256,7 @@ extern/opl/opl3.c
 src/engine/platform/sound/sn76496.cpp
 src/engine/platform/sound/ay8910.cpp
 src/engine/platform/sound/saa1099.cpp
+src/engine/platform/sound/namco.cpp
 src/engine/platform/sound/gb/apu.c
 src/engine/platform/sound/gb/timing.c
 src/engine/platform/sound/pce_psg.cpp
@@ -318,6 +319,10 @@ src/engine/platform/sound/vrcvi/vrcvi.cpp
 
 src/engine/platform/sound/scc/scc.cpp
 
+src/engine/platform/sound/ymz280b.cpp
+
+src/engine/platform/sound/rf5c68.cpp
+
 src/engine/platform/oplAInterface.cpp
 src/engine/platform/ym2608Interface.cpp
 src/engine/platform/ym2610Interface.cpp
@@ -358,6 +363,7 @@ src/engine/platform/tx81z.cpp
 src/engine/platform/ym2203.cpp
 src/engine/platform/ym2203ext.cpp
 src/engine/platform/ym2608.cpp
+src/engine/platform/ym2608ext.cpp
 src/engine/platform/ym2610.cpp
 src/engine/platform/ym2610ext.cpp
 src/engine/platform/ym2610b.cpp
@@ -384,6 +390,9 @@ src/engine/platform/pet.cpp
 src/engine/platform/vic20.cpp
 src/engine/platform/vrc6.cpp
 src/engine/platform/scc.cpp
+src/engine/platform/ymz280b.cpp
+src/engine/platform/namcowsg.cpp
+src/engine/platform/rf5c68.cpp
 src/engine/platform/dummy.cpp
 )
 
