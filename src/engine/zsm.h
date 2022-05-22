@@ -16,7 +16,7 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
- 
+
 #ifndef _ZSM_H
 #define _ZSM_H
 
@@ -25,8 +25,8 @@
 #include "dispatch.h"
 #include <stdlib.h>
 
-#define ZSM_MAGIC_HDR_SIZE 2
 #define ZSM_HEADER_SIZE 16
+#define ZSM_VERSION 1
 #define ZSM_YM_CMD 0x40
 #define ZSM_DELAY_CMD 0x80
 #define ZSM_YM_MAX_WRITES 63

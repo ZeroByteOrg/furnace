@@ -36,16 +36,22 @@ void ZSM::init(unsigned int rate) {
   }
   w = new SafeWriter;
   w->init();
-  // write blank ZSM magic header & data header
-  if (ZSM_MAGIC_HDR_SIZE==2) w->write("ZM",2);
+  // write default ZSM data header
+  w->write("zm",2); // magic header
+  w->writeC(ZSM_VERSION);
+  // no loop offset
+  w->writeS(0);
+  w->writeC(0);
+  // no PCM
   w->writeS(0x00);
-  w->writeC(0xff); // default to no-loop header
   w->writeC(0x00);
-  w->writeI(0x00);
+  // FM channel mask
   w->writeC(0x00);
+  // PSG channel mask
+  w->writeS(0x00);
   w->writeS((unsigned short)rate);
-  w->writeC(0x00);
-  w->writeI(0x00);
+  // 2 reserved bytes (set to zero)
+  w->writeS(0x00);
   tickRate = rate;
   loopOffset=-1;
   numWrites=0;
@@ -99,11 +105,11 @@ void ZSM::setLoopPoint() {
   tick(0); // flush any ticks+writes
   flushTicks(); // flush ticks if no writes
   logI("ZSM: loop at file offset %d bytes",w->tell());
-  loopOffset=w->tell()-ZSM_MAGIC_HDR_SIZE;
-  w->seek(0+ZSM_MAGIC_HDR_SIZE,SEEK_SET);
+  loopOffset=w->tell();
+  w->seek(0x03,SEEK_SET);
   w->writeS((short)(loopOffset&0xffff));
   w->writeC((short)((loopOffset>>16)&0xff));
-  w->seek(loopOffset+ZSM_MAGIC_HDR_SIZE,SEEK_SET);
+  w->seek(loopOffset,SEEK_SET);
   memset(&psgState,-1,sizeof(psgState));
 }
 
@@ -158,4 +164,3 @@ void ZSM::flushTicks() {
   }
   ticks=0;
 }
-	
