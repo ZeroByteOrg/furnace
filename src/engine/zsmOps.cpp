@@ -31,7 +31,7 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
   int VERA = -1;
   int YM = -1;
   int IGNORED = 0;
-  
+
   //loop = false;
   // find indexes for YM and VERA. Ignore other systems.
   for (int i=0; i<song.systemLen; i++) {
@@ -56,8 +56,8 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
 	return NULL;
   }
   if (IGNORED > 0)
-    logW("ZSM export ignoring %d unsupported systems",IGNORED);
-  
+    logW("ZSM export ignoring %d unsupported system%c",IGNORED,IGNORED>1?'s':' ');
+
   stop();
   repeatPattern=false;
   setOrder(0);
@@ -65,7 +65,7 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
 
   double origRate=got.rate;
   got.rate=zsmrate & 0xffff;
-  
+
   // determine loop point
   int loopOrder=0;
   int loopRow=0;
@@ -93,7 +93,7 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
   int fracWait=0;
   if (VERA >= 0) disCont[VERA].dispatch->toggleRegisterDump(true);
   if (YM >= 0) disCont[YM].dispatch->toggleRegisterDump(true);
- 
+
   while (!done) {
     if (loopPos==-1) {
       if (loopOrder==curOrder && loopRow==curRow && ticks==1 && loop) {
@@ -108,7 +108,7 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
           disCont[i].dispatch->getRegisterWrites().clear();
         }
         break;
-      }  
+      }
       if (!playing) {
 //        writeLoop=false;
         loopPos=-1;
@@ -152,11 +152,11 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
   }
   // end of song
   // done - close out.
-  
+
   got.rate = origRate;
   if (VERA >= 0) disCont[VERA].dispatch->toggleRegisterDump(false);
   if (YM >= 0) disCont[YM].dispatch->toggleRegisterDump(false);
-  
+
   remainingLoops=-1;
   playing=false;
   freelance=false;
@@ -166,5 +166,5 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
 
   BUSY_END;
   return zsm.finish();
- 
+
 }

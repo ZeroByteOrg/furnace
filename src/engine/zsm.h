@@ -46,6 +46,8 @@ class ZSM {
 	int numWrites;
 	int ticks;
 	int tickRate;
+  int ymMask = 0;
+  int psgMask = 0;
   public:
 	ZSM();
 	~ZSM();

@@ -65,28 +65,62 @@ int ZSM::getoffset() {
 }
 
 void ZSM::writeYM(unsigned char a, unsigned char v) {
-  numWrites++;
-  ymwrites.push_back(DivRegWrite(a,v));
-  // update YM shadow even though we're not yet de-duping YM writes....
+  int lastMask = ymMask;
   if (a==0x19 && v>=0x80) a=0x1a; // AMD/PSD use same reg addr. store PMD as 0x1a
-  if (a!=0x08) {
-	ymState[ym_NEW][a] = v;
+  if (a==0x08 && (v&0xf8)) ymMask |= (1 << (v & 0x07)); // mark chan as in-use if keyDN
+  if (a!=0x08) ymState[ym_NEW][a] = v;
+  bool writeit=false;
+  if (a < 0x20) {
+    if (a == 0x08) {
+      writeit = (ymMask & (1 << (v & 0x07))) > 0;
+      logI ("KeyUPDN event: v=%02x %c",v,writeit?'Y':'N');
+    }
+    else {
+      writeit = true;
+    }
+  } else {
+    writeit = (ymMask & (1 << (a & 0x07))) > 0; // a&0x07 = chan ID for regs >=0x20
+  }
+  if (lastMask != ymMask) {
+    // if the ymMask just changed, then a channel has become active.
+    // This can only happen on a KeyDN event, so voice = v & 0x07
+    // insert a keyUP just to be safe.
+    ymwrites.push_back(DivRegWrite(0x08,v&0x07));
+    // flush the ym_NEW states into the ZSM
+    for ( int i=0x20 + (v&0x07); i <= 0xff ; i+=8) {
+      if (ymState[ym_NEW][i] != ymState[ym_PREV][i]) {
+        ymState[ym_PREV][i] = ymState[ym_NEW][i];
+        ymwrites.push_back(DivRegWrite(i,ymState[ym_NEW][i]));
+        numWrites++;
+      }
+    }
+  }
+  if (writeit && ((ymState[ym_NEW][a] != ymState[ym_PREV][a])||a==0x08) ) {
+    // update YM shadow
+    ymState[ym_PREV][a] = ymState[ym_NEW][a];
+    // if reg = PMD, then change back to real register 0x19
+    if (a==0x1a) a=0x19;
+    ymwrites.push_back(DivRegWrite(a,v));
+    numWrites++;
   }
 }
 
 void ZSM::writePSG(unsigned char a, unsigned char v) {
   if (a  >= 64) {
-	  logD ("ZSM: ignoring VERA PSG write a=%02x v=%02x");
+	  logD ("ZSM: ignoring VERA PSG write a=%02x v=%02x",a,v);
 	  return;
   }
   if(psgState[psg_PREV][a] == v) {
 	if (psgState[psg_NEW][a] != v)
+    // extra write on same frame, returning register A to previous frame's value
 	  numWrites--;
   } else {
     if (psgState[psg_PREV][a] == psgState[psg_NEW][a])
+      // write into register A that is different than previous frame's value
       numWrites++;
   }
   psgState[psg_NEW][a] = v;
+  if ((a % 4 == 2) && (v & 0x3f)) psgMask |= (1 << (a>>2));
 }
 
 void ZSM::writePCM(unsigned char a, unsigned char v) {
@@ -111,6 +145,7 @@ void ZSM::setLoopPoint() {
   w->writeC((short)((loopOffset>>16)&0xff));
   w->seek(loopOffset,SEEK_SET);
   memset(&psgState,-1,sizeof(psgState));
+  memset(&ymState[ym_PREV],-1,sizeof(ymState[ym_PREV]));
 }
 
 SafeWriter* ZSM::finish() {
@@ -121,6 +156,9 @@ SafeWriter* ZSM::finish() {
   // todo: set channel-use bitmasks in header
   //       -- really need to do it because player STOP does not
   //       -- mute voices otherwise!
+  w->seek(0x09,SEEK_SET);
+  w->writeC((short)(ymMask & 0xff));
+  w->writeS((short)(psgMask & 0xffff));
   return w;
 }
 
