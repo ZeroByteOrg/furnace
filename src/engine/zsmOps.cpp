@@ -133,8 +133,8 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
       std::vector<DivRegWrite>& writes=disCont[i].dispatch->getRegisterWrites();
       if (writes.size() > 0) logD("zsmOps: Writing %d messages to chip %d",writes.size(), i);
       for (DivRegWrite& write: writes) {
-        if (i==0) zsm.writeYM(write.addr&0xff, write.val);
-        if (i==1) zsm.writePSG(write.addr&0xff, write.val);
+        if (i==YM) zsm.writeYM(write.addr&0xff, write.val);
+        if (i==VERA) zsm.writePSG(write.addr&0xff, write.val);
         writeCount++;
       }
       writes.clear();
