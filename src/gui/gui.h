@@ -900,6 +900,7 @@ class FurnaceGUI {
     float dpiScale;
     int viewPrevPattern;
     int guiColorsBase;
+    int guiColorsShading;
     int avoidRaisingPattern;
     int insFocusesPattern;
     int stepOnInsert;
@@ -925,6 +926,7 @@ class FurnaceGUI {
     int oscRoundedCorners;
     int oscTakesEntireWindow;
     int oscBorder;
+    int oscEscapesBoundary;
     int separateFMColors;
     int insEditColorize;
     int metroVol;
@@ -992,6 +994,7 @@ class FurnaceGUI {
       dpiScale(0.0f),
       viewPrevPattern(1),
       guiColorsBase(0),
+      guiColorsShading(0),
       avoidRaisingPattern(0),
       insFocusesPattern(1),
       stepOnInsert(0),
@@ -1015,6 +1018,7 @@ class FurnaceGUI {
       oscRoundedCorners(1),
       oscTakesEntireWindow(0),
       oscBorder(1),
+      oscEscapesBoundary(0),
       separateFMColors(0),
       insEditColorize(0),
       metroVol(100),

@@ -244,7 +244,7 @@ void DivPlatformNamcoWSG::tick(bool sysTick) {
     if (chan[i].std.pitch.had) {
       if (chan[i].std.pitch.mode) {
         chan[i].pitch2+=chan[i].std.pitch.val;
-        CLAMP_VAR(chan[i].pitch2,-2048,2048);
+        CLAMP_VAR(chan[i].pitch2,-32768,32767);
       } else {
         chan[i].pitch2=chan[i].std.pitch.val;
       }
@@ -399,13 +399,13 @@ int DivPlatformNamcoWSG::dispatch(DivCommand c) {
       int destFreq=NOTE_FREQUENCY(c.value2);
       bool return2=false;
       if (destFreq>chan[c.chan].baseFreq) {
-        chan[c.chan].baseFreq+=c.value;
+        chan[c.chan].baseFreq+=c.value*((parent->song.linearPitch==2)?1:8);
         if (chan[c.chan].baseFreq>=destFreq) {
           chan[c.chan].baseFreq=destFreq;
           return2=true;
         }
       } else {
-        chan[c.chan].baseFreq-=c.value;
+        chan[c.chan].baseFreq-=c.value*((parent->song.linearPitch==2)?1:8);
         if (chan[c.chan].baseFreq<=destFreq) {
           chan[c.chan].baseFreq=destFreq;
           return2=true;
