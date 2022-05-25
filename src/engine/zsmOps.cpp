@@ -35,21 +35,21 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
   //loop = false;
   // find indexes for YM and VERA. Ignore other systems.
   for (int i=0; i<song.systemLen; i++) {
-	switch (song.system[i]) {
-	  case DIV_SYSTEM_VERA:
-	    if (VERA >= 0) { IGNORED++;break; }
-	    VERA = i;
-	    logD("VERA detected as chip id %d",i);
-	    break;
-	  case DIV_SYSTEM_YM2151:
-	    if (YM >= 0) { IGNORED++;break; }
-	    YM = i;
-	    logD("YM detected as chip id %d",i);
-	    break;
-	  default:
-	    IGNORED++;
-	    logD("Ignoring chip %d systemID %d",i,song.system[i]);
-	}
+  	switch (song.system[i]) {
+  	  case DIV_SYSTEM_VERA:
+  	    if (VERA >= 0) { IGNORED++;break; }
+  	    VERA = i;
+  	    logD("VERA detected as chip id %d",i);
+  	    break;
+  	  case DIV_SYSTEM_YM2151:
+  	    if (YM >= 0) { IGNORED++;break; }
+  	    YM = i;
+  	    logD("YM detected as chip id %d",i);
+  	    break;
+  	  default:
+  	    IGNORED++;
+  	    logD("Ignoring chip %d systemID %d",i,song.system[i]);
+  	}
   }
   if (VERA < 0 && YM < 0) {
 	logE("No supported systems for ZSM");
@@ -76,28 +76,34 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
 
   ZSM zsm;
   zsm.init(zsmrate);
+
+  // reset the playback state
   curOrder=0;
   freelance=false;
   playing=false;
   extValuePresent=false;
   remainingLoops=-1;
 
-  // write song data
+  // Prepare to write song data
   playSub(false);
   size_t tickCount=0;
-//  bool writeLoop=false;
   bool done=false;
   int loopPos=-1;
-//  int loopTick=-1;
   int writeCount=0;
-  int fracWait=0;
+  int fracWait=0; // accumulates fractional ticks
   if (VERA >= 0) disCont[VERA].dispatch->toggleRegisterDump(true);
-  if (YM >= 0) disCont[YM].dispatch->toggleRegisterDump(true);
+  if (YM >= 0) {
+    disCont[YM].dispatch->toggleRegisterDump(true);
+    zsm.writeYM(0x18,0); // initialize the LFO freq to 0
+    // note - I think there's a bug where Furnace writes AMD/PMD=max
+    // that shouldn't be there, requiring this initialization that shouldn't
+    // be there for ZSM.
+  }
 
   while (!done) {
     if (loopPos==-1) {
       if (loopOrder==curOrder && loopRow==curRow && ticks==1 && loop) {
-		loopPos=zsm.getoffset();
+        loopPos=zsm.getoffset();
         zsm.setLoopPoint();
       }
     }
@@ -110,28 +116,30 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
         break;
       }
       if (!playing) {
-//        writeLoop=false;
         loopPos=-1;
       }
     }
     // get register dumps
     for (int j=0; j<2; j++) {
-	  int i=0;
-	  if (j==0) {
-	    if (YM < 0)
-	      continue;
-	    else
-	      i=YM;
-	  }
-	  if (j==1) {
-	    if (VERA < 0)
-	      continue;
-	    else {
-		  i=VERA;
-	    }
-	  }
+  	  int i=0;
+      // dump YM writes first
+  	  if (j==0) {
+  	    if (YM < 0)
+  	      continue;
+  	    else
+  	      i=YM;
+  	  }
+      // dump VERA writes second
+  	  if (j==1) {
+  	    if (VERA < 0)
+  	      continue;
+  	    else {
+          i=VERA;
+  	    }
+  	  }
       std::vector<DivRegWrite>& writes=disCont[i].dispatch->getRegisterWrites();
-      if (writes.size() > 0) logD("zsmOps: Writing %d messages to chip %d",writes.size(), i);
+      if (writes.size() > 0)
+        logD("zsmOps: Writing %d messages to chip %d",writes.size(), i);
       for (DivRegWrite& write: writes) {
         if (i==YM) zsm.writeYM(write.addr&0xff, write.val);
         if (i==VERA) zsm.writePSG(write.addr&0xff, write.val);
@@ -151,8 +159,8 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
     }
   }
   // end of song
-  // done - close out.
 
+  // done - close out.
   got.rate = origRate;
   if (VERA >= 0) disCont[VERA].dispatch->toggleRegisterDump(false);
   if (YM >= 0) disCont[YM].dispatch->toggleRegisterDump(false);
@@ -162,9 +170,6 @@ SafeWriter* DivEngine::saveZSM(unsigned int zsmrate, bool loop) {
   freelance=false;
   extValuePresent=false;
 
-  logI("%d register writes total.",writeCount);
-
   BUSY_END;
   return zsm.finish();
-
 }
